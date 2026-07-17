@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Enable manual class-based dark mode in Tailwind v4 */
+@variant dark (&:is(.dark *));
+
+/* Global Dark Mode Background & Text */
+html, body {
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300;
+}
+
+/* Global Placeholder Color Fix */
+input::placeholder, textarea::placeholder {
+  @apply text-slate-400 dark:text-slate-500 ;
+}
+
+/* Custom Scrollbar */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #475569;
+  }
+}
+@theme {
+  /* ইংরেজি ফন্ট Montserrat এবং বাংলা Noto Serif Bengali */
+  --font-sans: 'Montserrat', 'Noto Serif Bengali', sans-serif;
+  
+  /* হেডিং এর জন্য Anton এবং বাংলা Noto Serif Bengali */
+  --font-heading: 'Anton', 'Noto Serif Bengali', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    @apply antialiased text-slate-800 dark:text-slate-200;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    @apply tracking-wide;
+  }
+}
