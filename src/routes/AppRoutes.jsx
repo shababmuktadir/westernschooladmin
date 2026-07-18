@@ -13,7 +13,8 @@ import SeatPlan from "@/features/students/pages/SeatPlan";
 import FeeEntry from "@/features/fee/pages/FeeEntry";
 import BulkFeeImport from "@/features/fee/pages/BulkFeeImport"; // নতুন ইমপোর্ট
 import FeeHistory from "@/features/fee/pages/FeeHistory";
-  
+import AddAdmin from "@/features/auth/pages/AddAdmin";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -31,6 +32,7 @@ export default function AppRoutes() {
           <Route path="/fee/entry" element={<FeeEntry />} />
           <Route path="/fee/bulk-import" element={<BulkFeeImport />} /> {/* নতুন রাউট */}
           <Route path="/fee/history" element={<FeeHistory />} />
+          <Route path="/add-admin" element={<AddAdmin />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
