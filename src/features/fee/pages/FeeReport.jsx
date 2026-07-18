@@ -4,13 +4,12 @@ import {
   PieChart, Pie, Cell, Legend, AreaChart, Area 
 } from "recharts";
 import { 
-  Download, TrendingUp, DollarSign, Calendar, Users, Loader2, Award, CheckCircle2, Layers 
+  Download, TrendingUp, DollarSign, Calendar, Users, Loader2, Award, CheckCircle2, Layers, Database 
 } from "lucide-react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 // --- ফায়ারবেস ইমপোর্ট ---
-// আপনার প্রজেক্টের ফায়ারবেস কনফিগারেশন ফাইল (db) এখানে ইমপোর্ট করুন
 import { db } from "@/config/firebase"; 
 import { collection, getDocs } from "firebase/firestore";
 
@@ -21,7 +20,6 @@ export default function FeeReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- ফায়ারবেস থেকে সব ডকুমেন্ট নিয়ে আসার লজিক ---
   useEffect(() => {
     const fetchAllFees = async () => {
       try {
@@ -45,7 +43,6 @@ export default function FeeReport() {
     fetchAllFees();
   }, []);
 
-  // --- সমস্ত ডকুমেন্টের ডেটা প্রসেসিং এবং অ্যাডভান্সড ক্যালকুলেশন ---
   const reportStats = useMemo(() => {
     let overallTotal = 0;
     const feeTypeMap = {};
@@ -54,21 +51,17 @@ export default function FeeReport() {
     const studentMap = {};
 
     feesData.forEach(doc => {
-      // ১. ওভারল টোটাল ক্যালকুলেশন
       overallTotal += doc.grandTotal || 0;
 
-      // ২. সব ডকুমেন্ট থেকে ফি টাইপ অনুযায়ী আর্নিং যোগ করা (Exam, Admission, Re-admission ইত্যাদি)
       Object.entries(doc.feeDetails || {}).forEach(([type, amount]) => {
         feeTypeMap[type] = (feeTypeMap[type] || 0) + (Number(amount) || 0);
       });
 
-      // ৩. ইনভয়েস ডেট (YYYY-MM) অনুযায়ী মান্থলি কালেকশন ট্র্যাক
       if (doc.invoiceDate) {
         const invMonth = doc.invoiceDate.substring(0, 7);
         invoiceMonthMap[invMonth] = (invoiceMonthMap[invMonth] || 0) + (doc.grandTotal || 0);
       }
 
-      // ৪. স্টুডেন্টদের ডেটা এগ্রিগেট করা (কোন মাস পর্যন্ত পেইড করেছে তা বের করা)
       if (doc.studentId) {
         if (!studentMap[doc.studentId]) {
           studentMap[doc.studentId] = {
@@ -82,16 +75,13 @@ export default function FeeReport() {
         }
         studentMap[doc.studentId].totalPaid += (doc.grandTotal || 0);
         
-        // মাসের নামগুলো Set-এ যোগ করা
         (doc.selectedMonths || []).forEach(m => studentMap[doc.studentId].months.add(m));
 
-        // স্টুডেন্টের নিজের ফি ব্রেকডাউন (গ্রাফের জন্য)
         Object.entries(doc.feeDetails || {}).forEach(([type, amount]) => {
           studentMap[doc.studentId].feeBreakdown[type] = (studentMap[doc.studentId].feeBreakdown[type] || 0) + (Number(amount) || 0);
         });
       }
 
-      // ৫. একাডেমিক মাস অনুযায়ী ফি টাইপের ব্রেকডাউন (পিডিএফ এর জন্য)
       Object.entries(doc.monthWiseDetails || {}).forEach(([monthName, details]) => {
         if (!academicMonthMap[monthName]) academicMonthMap[monthName] = { total: 0 };
         Object.entries(details.amounts || {}).forEach(([feeType, amtStr]) => {
@@ -102,11 +92,9 @@ export default function FeeReport() {
       });
     });
 
-    // গ্রাফের জন্য ফি টাইপ ডেটা ফরম্যাট
     const feeTypeChart = Object.keys(feeTypeMap).map(key => ({ name: key, value: feeTypeMap[key] }));
-    const allFeeNames = Object.keys(feeTypeMap); // ডাইনামিক সব ফি-এর নাম
+    const allFeeNames = Object.keys(feeTypeMap); 
     
-    // সর্বোচ্চ উপার্জনের মাস বের করা
     let highestMonth = { month: "নাই", amount: 0 };
     const invoiceChart = Object.keys(invoiceMonthMap).sort().map(key => {
       if (invoiceMonthMap[key] > highestMonth.amount) {
@@ -115,13 +103,11 @@ export default function FeeReport() {
       return { month: key, earning: invoiceMonthMap[key] };
     });
 
-    // টাইমলাইন রেঞ্জ
     const sortedMonths = Object.keys(invoiceMonthMap).sort();
     const startMonth = sortedMonths[0] || "N/A";
     const endMonth = sortedMonths[sortedMonths.length - 1] || "N/A";
     const latestMonthEarning = invoiceMonthMap[endMonth] || 0;
 
-    // সর্বোচ্চ পেয়ার এবং তার সর্বশেষ মাস বের করা
     let maxPaidStudent = { name: "নাই", amount: 0, class: "", id: "", upToMonth: "N/A" };
     let mostMonthsStudent = { name: "নাই", monthsCount: 0, class: "", id: "", upToMonth: "N/A" };
 
@@ -129,14 +115,11 @@ export default function FeeReport() {
       const monthsArray = Array.from(s.months);
       const monthsCount = monthsArray.length;
       
-      // সর্বশেষ কোন মাস পর্যন্ত ফি দেওয়া হয়েছে (e.g., "December 2026" বা অ্যারের শেষ মাসটি)
       const upToMonth = monthsCount > 0 ? monthsArray[monthsCount - 1] : "N/A";
       
-      // Max Paid Ever Check
       if (s.totalPaid > maxPaidStudent.amount) {
         maxPaidStudent = { name: s.name, amount: s.totalPaid, class: s.class, id: s.id, upToMonth };
       }
-      // Most Months Cleared Check
       if (monthsCount > mostMonthsStudent.monthsCount) {
         mostMonthsStudent = { name: s.name, monthsCount: monthsCount, class: s.class, id: s.id, upToMonth };
       }
@@ -149,7 +132,6 @@ export default function FeeReport() {
       };
     });
 
-    // স্টুডেন্ট বেসড স্ট্যাকড বার চার্ট ডেটা (শীর্ষ ১০ জন শিক্ষার্থী)
     const topStudentsChart = [...studentsList]
       .sort((a, b) => b.totalPaid - a.totalPaid)
       .slice(0, 10)
@@ -158,7 +140,7 @@ export default function FeeReport() {
         fullName: s.name,
         totalAmount: s.totalPaid,
         upToMonth: s.upToMonth,
-        ...s.feeBreakdown // ডাইনামিক ফি টাইপগুলো গ্রাফের অবজেক্টে যুক্ত করা হলো
+        ...s.feeBreakdown 
       }));
 
     return {
@@ -179,8 +161,6 @@ export default function FeeReport() {
     };
   }, [feesData]);
 
-
-  // --- প্রফেশনাল A4 PDF জেনারেট ---
   const generatePDF = () => {
     if (feesData.length === 0) return alert("ডাউনলোড করার মতো কোনো ডেটা নেই!");
     
@@ -193,8 +173,9 @@ export default function FeeReport() {
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 40, 70);
-    doc.text(`Duration: ${reportStats.startMonth} to ${reportStats.endMonth}`, 40, 85);
-    doc.text(`Total Earnings: ${reportStats.overallTotal} BDT`, 40, 100);
+    doc.text(`Based on: ${feesData.length} database records`, 40, 85);
+    doc.text(`Duration: ${reportStats.startMonth} to ${reportStats.endMonth}`, 40, 100);
+    doc.text(`Total Earnings: ${reportStats.overallTotal.toLocaleString()} BDT`, 40, 115);
 
     const tableColumn = ["Academic Month", "Fee Types Breakdown", "Total Amount (BDT)"];
     const tableRows = [];
@@ -218,12 +199,12 @@ export default function FeeReport() {
       tableRows.push([
         month,
         breakdownText.trim(),
-        `${mData.total} BDT`
+        `${mData.total.toLocaleString()} BDT`
       ]);
     });
 
     doc.autoTable({
-      startY: 120,
+      startY: 135,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
@@ -235,21 +216,22 @@ export default function FeeReport() {
     doc.save(`WSC_All_Fees_Report_${new Date().toISOString().slice(0,10)}.pdf`);
   };
 
-  // --- লোডিং স্টেট স্ক্রিন ---
+  // Glassmorphism Base Classes
+  const glassCard = "bg-white/60 dark:bg-slate-900/40 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] rounded-2xl";
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-[#141821]">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-transparent">
         <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-4" />
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">ফায়ারবেস থেকে সকল ফি রিপোর্ট লোড হচ্ছে...</p>
       </div>
     );
   }
 
-  // --- এরর স্টেট স্ক্রিন ---
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#141821]">
-        <div className="bg-white dark:bg-[#1C212B] p-6 rounded-2xl shadow-md border border-red-100 dark:border-red-900/30 text-center">
+      <div className="flex items-center justify-center min-h-screen bg-transparent">
+        <div className={`${glassCard} p-6 text-center border-red-200/50 dark:border-red-900/30`}>
           <p className="text-red-600 dark:text-red-400 font-semibold">{error}</p>
         </div>
       </div>
@@ -257,19 +239,26 @@ export default function FeeReport() {
   }
 
   return (
-    <div className="p-6 bg-slate-50 dark:bg-[#141821] min-h-screen font-sans text-slate-800 dark:text-slate-200">
+    <div className="p-6 bg-transparent min-h-screen font-sans text-slate-800 dark:text-slate-200 animate-in fade-in duration-300">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Fee Collection & Revenue Analytics</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            সমগ্র কালেকশন ডেটার ডিপ অ্যানালাইসিস এবং স্টুডেন্ট পারফরম্যান্স ওভারভিউ
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Fee Collection & Revenue Analytics</h1>
+            
+            <span className="flex items-center gap-1 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-100/70 border border-indigo-200/50 dark:border-indigo-500/30 dark:text-indigo-400 dark:bg-indigo-500/20 backdrop-blur-sm rounded-full shadow-sm">
+              <Database className="w-3.5 h-3.5" />
+              {feesData.length} Documents Analyzed
+            </span>
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            সমগ্র কালেকশন ডেটার ডিপ অ্যানালাইসিস এবং স্টুডেন্ট পারফরম্যান্স ওভারভিউ।
           </p>
         </div>
         <button 
           onClick={generatePDF}
-          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600/90 hover:bg-indigo-700 backdrop-blur-sm text-white font-medium rounded-xl transition-all shadow-sm shrink-0"
         >
           <Download className="w-4 h-4" />
           A4 পিডিএফ ডাউনলোড
@@ -279,93 +268,93 @@ export default function FeeReport() {
       {/* 6-Grid Advanced KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         
-        {/* Total Income with Date Range */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+        {/* Total Income */}
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
             <DollarSign className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">সর্বমোট ইনকাম</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">সর্বমোট ইনকাম</p>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white truncate">৳ {reportStats.overallTotal.toLocaleString()}</h3>
-            <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium mt-0.5 truncate">
+            <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-0.5 truncate">
               {reportStats.startMonth} থেকে {reportStats.endMonth}
             </p>
           </div>
         </div>
 
         {/* Highest Earning Month */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
             <TrendingUp className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">সর্বোচ্চ আয়ের মাস</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">সর্বোচ্চ আয়ের মাস</p>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white truncate">{reportStats.highestMonth.month}</h3>
-            <p className="text-xs text-emerald-500 dark:text-emerald-400 font-medium mt-0.5">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
               আয়: ৳ {reportStats.highestMonth.amount.toLocaleString()}
             </p>
           </div>
         </div>
 
-        {/* Max Paid Student Ever (With Up To Month) */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+        {/* Max Paid Student Ever */}
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
             <Award className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">সর্বোচ্চ ফি প্রদানকারী</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">সর্বোচ্চ ফি প্রদানকারী</p>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate" title={reportStats.maxPaidStudent.name}>
               {reportStats.maxPaidStudent.name}
             </h3>
-            <p className="text-xs text-amber-500 dark:text-amber-400 font-medium mt-0.5">
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
               পেইড: ৳ {reportStats.maxPaidStudent.amount.toLocaleString()} ({reportStats.maxPaidStudent.upToMonth} পর্যন্ত)
             </p>
           </div>
         </div>
 
         {/* Most Months Cleared Student */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">সর্বাধিক মাস পরিশোধকারী</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">সর্বাধিক মাস পরিশোধকারী</p>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate" title={reportStats.mostMonthsStudent.name}>
               {reportStats.mostMonthsStudent.name}
             </h3>
-            <p className="text-xs text-purple-500 dark:text-purple-400 font-medium mt-0.5">
+            <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-0.5">
               ক্লিয়ার: {reportStats.mostMonthsStudent.monthsCount} মাস ({reportStats.mostMonthsStudent.upToMonth} পর্যন্ত)
             </p>
           </div>
         </div>
 
         {/* Latest Month Earning */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-500/10 flex items-center justify-center text-pink-600 dark:text-pink-400 shrink-0">
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-pink-500/10 flex items-center justify-center text-pink-600 dark:text-pink-400 shrink-0">
             <Calendar className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">চলতি মাস ({reportStats.endMonth})</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">চলতি মাস ({reportStats.endMonth})</p>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">৳ {reportStats.latestMonthEarning.toLocaleString()}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">লেটেস্ট ইনভয়েস মাস</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">লেটেস্ট ইনভয়েস মাস</p>
           </div>
         </div>
 
         {/* Total Active Students */}
-        <div className="bg-white dark:bg-[#1C212B] p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+        <div className={`${glassCard} p-5 flex items-center gap-4 hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+          <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
             <Users className="w-6 h-6" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">মোট পেইড শিক্ষার্থী</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">মোট পেইড শিক্ষার্থী</p>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{reportStats.studentsList.length} জন</h3>
-            <p className="text-xs text-slate-400 mt-0.5">ডেটাবেস রেকর্ড অনুযায়ী</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ডেটাবেস রেকর্ড অনুযায়ী</p>
           </div>
         </div>
 
       </div>
 
-      {/* Dynamic All Fee Types Breakdown Banner (Exam, Admission, Re-admission etc.) */}
+      {/* Dynamic All Fee Types Breakdown Banner */}
       <div className="mb-8">
         <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
           <Layers className="w-4 h-4 text-indigo-500" />
@@ -373,7 +362,7 @@ export default function FeeReport() {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {reportStats.feeTypeChart.map((fee, idx) => (
-            <div key={idx} className="bg-white dark:bg-[#1C212B] p-4 rounded-xl border border-slate-100 dark:border-white/5 shadow-sm">
+            <div key={idx} className={`${glassCard} p-4 !rounded-xl`}>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate" title={fee.name}>{fee.name}</p>
               <p className="text-lg font-bold text-slate-900 dark:text-white mt-1" style={{ color: COLORS[idx % COLORS.length] }}>
                 ৳ {fee.value.toLocaleString()}
@@ -387,7 +376,7 @@ export default function FeeReport() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         
         {/* Area Chart: Monthly Revenue */}
-        <div className="bg-white dark:bg-[#1C212B] p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5">
+        <div className={`${glassCard} p-6`}>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">মাসিক রেভিনিউ কালেকশন গ্রাফ</h3>
           <div className="h-72">
             {reportStats.invoiceChart.length > 0 ? (
@@ -395,16 +384,16 @@ export default function FeeReport() {
                 <AreaChart data={reportStats.invoiceChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorEarning" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
                       <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                   <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value) => [`৳ ${value}`, 'Earning']}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(8px)', color: '#fff' }}
+                    formatter={(value) => [`৳ ${value.toLocaleString()}`, 'Earning']}
                   />
                   <Area type="monotone" dataKey="earning" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorEarning)" />
                 </AreaChart>
@@ -416,7 +405,7 @@ export default function FeeReport() {
         </div>
 
         {/* Pie Chart: Fee Types */}
-        <div className="bg-white dark:bg-[#1C212B] p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5">
+        <div className={`${glassCard} p-6`}>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">ফি টাইপ অনুযায়ী আয়ের অনুপাত</h3>
           <div className="h-72">
             {reportStats.feeTypeChart.length > 0 ? (
@@ -430,14 +419,15 @@ export default function FeeReport() {
                     outerRadius={100}
                     paddingAngle={5}
                     dataKey="value"
+                    stroke="rgba(255,255,255,0.1)"
                   >
                     {reportStats.feeTypeChart.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value) => [`৳ ${value}`, 'Amount']}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value) => [`৳ ${value.toLocaleString()}`, 'Amount']}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(8px)', color: '#fff' }}
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }}/>
                 </PieChart>
@@ -449,19 +439,19 @@ export default function FeeReport() {
         </div>
       </div>
 
-      {/* Section 2: Student Based Stacked Bar Chart (NEW UPGRADE) */}
-      <div className="bg-white dark:bg-[#1C212B] p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 mb-8">
+      {/* Section 2: Student Based Stacked Bar Chart */}
+      <div className={`${glassCard} p-6 mb-8`}>
         <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-2">
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">শীর্ষ ১০ শিক্ষার্থীর ফি ব্রেকডাউন (Stacked Bar Chart)</h3>
-            <p className="text-xs text-slate-400">কোন শিক্ষার্থী কোন খাতে কত টাকা দিয়েছে তার ডাইনামিক স্ট্যাকড বার-চার্ট</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">কোন শিক্ষার্থী কোন খাতে কত টাকা দিয়েছে তার ডাইনামিক স্ট্যাকড বার-চার্ট</p>
           </div>
         </div>
         <div className="h-80">
           {reportStats.topStudentsChart.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={reportStats.topStudentsChart} margin={{ top: 20, right: 20, left: -10, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
@@ -473,12 +463,11 @@ export default function FeeReport() {
                 />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1e293b', color: '#fff' }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(8px)', color: '#fff' }}
                   formatter={(value, name) => [`৳ ${Number(value).toLocaleString()}`, name]}
                   labelFormatter={(label, payload) => `${payload[0]?.payload?.fullName || label} (সর্বশেষ: ${payload[0]?.payload?.upToMonth || 'N/A'})`}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}/>
-                {/* ডাইনামিক সব ফি টাইপের জন্য আলাদা স্ট্যাকড বার তৈরি হবে */}
                 {reportStats.allFeeNames.map((feeName, index) => (
                   <Bar 
                     key={feeName} 
@@ -497,16 +486,16 @@ export default function FeeReport() {
       </div>
 
       {/* Student Payments Table */}
-      <div className="bg-white dark:bg-[#1C212B] rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+      <div className={`${glassCard} overflow-hidden`}>
+        <div className="px-6 py-5 border-b border-white/30 dark:border-white/10 flex justify-between items-center bg-white/30 dark:bg-slate-900/30">
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">শিক্ষার্থীদের ফি প্রদানের বিস্তারিত ইতিহাস (Up to Month সহ)</h3>
-          <span className="text-xs font-semibold px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full">
-            মোট রেকর্ড: {reportStats.studentsList.length}
+          <span className="text-xs font-semibold px-3 py-1 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 backdrop-blur-sm rounded-full border border-indigo-200/50 dark:border-indigo-500/20">
+            মোট স্টুডেন্ট: {reportStats.studentsList.length} জন
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-[#242A38]">
+            <thead className="text-xs text-slate-600 dark:text-slate-300 uppercase bg-white/40 dark:bg-white/5 backdrop-blur-md">
               <tr>
                 <th className="px-6 py-4 font-semibold">আইডি</th>
                 <th className="px-6 py-4 font-semibold">নাম</th>
@@ -516,18 +505,18 @@ export default function FeeReport() {
                 <th className="px-6 py-4 font-semibold text-right">সর্বমোট পেইড (BDT)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+            <tbody className="divide-y divide-white/40 dark:divide-white/10">
               {reportStats.studentsList.map((student, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                <tr key={idx} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-medium text-indigo-600 dark:text-indigo-400">{student.id}</td>
-                  <td className="px-6 py-4 font-medium">{student.name}</td>
-                  <td className="px-6 py-4">{student.class}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">{student.name}</td>
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{student.class}</td>
                   <td className="px-6 py-4">
-                    <span className="text-xs px-2.5 py-1 bg-slate-100 dark:bg-[#343D52] text-slate-600 dark:text-slate-300 rounded-lg whitespace-normal leading-relaxed">
+                    <span className="text-xs px-2.5 py-1 bg-white/50 dark:bg-white/10 backdrop-blur-sm border border-white/40 dark:border-white/5 text-slate-700 dark:text-slate-300 rounded-lg whitespace-normal leading-relaxed">
                       {student.monthsList}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/5">
+                  <td className="px-6 py-4 text-center font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/5 backdrop-blur-sm">
                     {student.upToMonth}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">

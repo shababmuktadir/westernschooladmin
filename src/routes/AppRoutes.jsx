@@ -13,7 +13,9 @@ import SeatPlan from "@/features/students/pages/SeatPlan";
 import FeeEntry from "@/features/fee/pages/FeeEntry";
 import BulkFeeImport from "@/features/fee/pages/BulkFeeImport";
 import FeeHistory from "@/features/fee/pages/FeeHistory";
-import AddAdmin from "@/features/auth/pages/AddAdmin";
+import AddAdmin from "@/features/fee/pages/AddAdmin";
+import AttendanceSmsPage from "@/features/sms/pages/AttendanceSmsPage";
+import CustomSmsPage from "@/features/sms/pages/CustomSmsPage";
 
 // ✅ New import
 import FeeReport from "@/features/fee/pages/FeeReport";
@@ -39,8 +41,11 @@ export default function AppRoutes() {
           
           {/* ✅ New route */}
           <Route path="/fee/report" element={<FeeReport />} />
-          
+          <Route path="/attendance-sms" element={<AttendanceSmsPage />} />
+<Route path="/custom-sms" element={<CustomSmsPage />} />
           <Route path="/add-admin" element={<AddAdmin />} />
+          
+
         </Route>
       </Route>
       

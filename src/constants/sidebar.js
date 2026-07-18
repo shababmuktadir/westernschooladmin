@@ -14,7 +14,10 @@ import {
   FileText, 
   Map, 
   Presentation,
-  Building2
+  Building2,
+  MessageSquare,   // new import
+  CalendarCheck,   // new import
+  Send             // new import
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -25,7 +28,7 @@ export const SIDEBAR_MENU = [
   },
   { 
     title: "শিক্ষার্থী সেকশন", 
-    icon: GraduationCap, // Mega Section Icon
+    icon: GraduationCap,
     subItems: [
       { 
         title: "অ্যাকাউন্ট", 
@@ -67,16 +70,25 @@ export const SIDEBAR_MENU = [
   },
   { 
     title: "শিক্ষক সেকশন", 
-    icon: Presentation, // Teachers Section Icon
+    icon: Presentation,
     subItems: [
       // ভবিষ্যতে আইটেম এখানে যুক্ত করবেন
     ]
   },
   { 
     title: "অফিস সেকশন", 
-    icon: Building2, // Office Section Icon
+    icon: Building2,
     subItems: [
        // ভবিষ্যতে আইটেম এখানে যুক্ত করবেন
+    ]
+  },
+  // নতুন SMS মডিউল যুক্ত করা হলো
+  { 
+    title: "SMS মডিউল", 
+    icon: MessageSquare,
+    subItems: [
+      { title: "অটো হাজিরা SMS", path: "/attendance-sms", icon: CalendarCheck },
+      { title: "কাস্টম SMS", path: "/custom-sms", icon: Send }
     ]
   }
 ];
