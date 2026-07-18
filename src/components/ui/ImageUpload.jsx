@@ -1,110 +1,147 @@
-import { useCallback, useState } from "react";
-import { useDropzone } from "react-dropzone";
-import { UploadCloud, X, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import React, { useState, useRef, useEffect } from "react";
+import { UploadCloud, X } from "lucide-react";
 
-export default function ImageUpload({ onUpload, defaultImage, onUploading }) {
-  const [preview, setPreview] = useState(defaultImage || null);
-  const [isUploading, setIsUploading] = useState(false);
+export default function ImageUpload({
+  label,
+  error,
+  value, 
+  onChange,
+  className = "",
+  id,
+  accept = "image/png, image/jpeg, image/jpg",
+  maxSize = 2 * 1024 * 1024 // ডিফল্ট ২ মেগাবাইট (2MB)
+}) {
+  const [dragActive, setDragActive] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const inputRef = useRef(null);
 
-  const onDrop = useCallback(async (acceptedFiles, fileRejections) => {
-    // 11 & 12. Check File Type and Max Size validations (Max 10MB)
-    if (fileRejections.length > 0) {
-      toast.error("Invalid file. Only JPG, JPEG, PNG, WEBP (Max 10MB) allowed.");
-      return;
+  // ইনশিয়াল ভ্যালু বা সিলেক্ট করা ছবি প্রিভিউ হিসেবে সেট করা
+  useEffect(() => {
+    if (typeof value === "string") {
+      setPreview(value);
+    } else if (value instanceof File) {
+      const objectUrl = URL.createObjectURL(value);
+      setPreview(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    } else {
+      setPreview(null);
     }
+  }, [value]);
 
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    // 8. Add proper loading state while uploading
-    setIsUploading(true);
-    if (onUploading) onUploading(true); // Disable submit button in parent
-
-    // 1. Create a FormData object & Append fields
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "Western");
-
-    try {
-      // 2 & 13. Upload image using async/await and try/catch
-      const res = await fetch("https://api.cloudinary.com/v1_1/do1dejkkk/image/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("Cloudinary upload failed");
-
-      // 3 & 4. Wait until upload is completed & Store returned data
-      const data = await res.json();
-      
-      // 5 & 7. Replace previous image value with secure_url & Display preview
-      setPreview(data.secure_url);
-      
-      // 6. Pass only the secure_url to the form (to save in Firestore)
-      if (onUpload) onUpload(data.secure_url);
-      
-      toast.success("Image uploaded to Cloudinary successfully!");
-    } catch (error) {
-      console.error("Cloudinary upload error:", error);
-      // 10. Show upload errors if the request fails
-      toast.error("Failed to upload image. Please try again.");
-    } finally {
-      setIsUploading(false);
-      if (onUploading) onUploading(false); // Enable submit button in parent
-    }
-  }, [onUpload, onUploading]);
-
-  const removeImage = (e) => {
+  const handleDrag = (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    setPreview(null);
-    if (onUpload) onUpload("");
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/jpeg": [".jpeg", ".jpg"],
-      "image/png": [".png"],
-      "image/webp": [".webp"],
-    },
-    maxSize: 10 * 1024 * 1024, // 10 MB
-    maxFiles: 1,
-  });
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleChange = (e) => {
+    e.preventDefault();
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleFile = (file) => {
+    if (file.size > maxSize) {
+      alert(`ছবির সাইজ অনেক বড়। সর্বোচ্চ সাইজ ${maxSize / (1024 * 1024)}MB হতে হবে।`);
+      return;
+    }
+    if (onChange) {
+      onChange(file);
+    }
+  };
+
+  const removeImage = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onChange) {
+      onChange(null);
+    }
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  };
+
+  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-') || Math.random().toString(36).substr(2, 9);
 
   return (
-    <div 
-      {...getRootProps()} 
-      className={`relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
-        isDragActive 
-          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
-          : "border-slate-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50 dark:bg-slate-800"
-      } ${isUploading ? "pointer-events-none opacity-70 border-blue-400" : ""}`}
-    >
-      <input {...getInputProps()} />
+    <div className={`w-full ${className}`}>
+      {label && (
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          {label}
+        </label>
+      )}
       
-      {isUploading ? (
-        <div className="py-8 flex flex-col items-center justify-center text-blue-600 dark:text-blue-400">
-          <Loader2 className="w-8 h-8 animate-spin mb-2" />
-          <p className="text-sm font-medium">Uploading Image...</p>
-        </div>
-      ) : preview ? (
-        <div className="relative w-32 h-32 mx-auto">
-          <img src={preview} alt="Preview" className="w-full h-full object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm" />
-          <button 
-            type="button"
-            onClick={removeImage}
-            className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-md transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <div className="py-6 flex flex-col items-center text-slate-500 dark:text-slate-400">
-          <UploadCloud className="w-10 h-10 mb-2 text-slate-400 dark:text-slate-500" />
-          <p className="text-sm font-medium">Drag & Drop Image</p>
-          <p className="text-xs mt-1">JPG, PNG, WEBP (Max 10MB)</p>
-        </div>
+      <div
+        className={`relative w-full rounded-xl border-2 border-dashed transition-all
+          ${dragActive ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-slate-300 dark:border-slate-700"}
+          ${error ? "border-red-500 bg-red-50 dark:bg-red-900/10" : ""}
+          ${preview ? "p-2" : "p-6"}
+          hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex items-center justify-center min-h-[160px]
+        `}
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        onClick={() => !preview && inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept={accept}
+          onChange={handleChange}
+          className="hidden"
+        />
+
+        {preview ? (
+          <div className="relative w-full h-full min-h-[140px] rounded-lg overflow-hidden group flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+            <img 
+              src={preview} 
+              alt="Preview" 
+              className="max-h-48 object-contain rounded-lg"
+            />
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <button
+                type="button"
+                onClick={removeImage}
+                className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                title="Remove image"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center mb-3">
+              <UploadCloud className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              ক্লিক করুন অথবা ছবি টেনে এনে ছেড়ে দিন
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              PNG, JPG বা JPEG (সর্বোচ্চ 2MB)
+            </p>
+          </div>
+        )}
+      </div>
+      
+      {error && (
+        <p className="mt-1.5 text-sm text-red-500 dark:text-red-400">{error}</p>
       )}
     </div>
   );

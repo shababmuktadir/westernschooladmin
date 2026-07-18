@@ -1,4 +1,12 @@
-import { LayoutDashboard, Users, Banknote, FileText, Map, FileBadge, FileSpreadsheet } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  Users, 
+  Banknote, 
+  FileText, 
+  Map, 
+  FolderOpen, 
+  FileSpreadsheet 
+} from "lucide-react";
 
 export const SIDEBAR_MENU = [
   { title: "ড্যাশবোর্ড", path: "/", icon: LayoutDashboard },
@@ -16,13 +24,12 @@ export const SIDEBAR_MENU = [
     subItems: [
       { title: "ফি এন্ট্রি", path: "/fee/entry" },
       { title: "ফি হিস্ট্রি", path: "/fee/history" },
-      { title: "ফি ইনভয়েস এডিট", path: "/fee/invoice-edit" }
+      { title: "ফি ইনভয়েস এডিট", path: "/fee/invoice-edit" }
     ]
   },
   { title: "প্রবেশপত্র", path: "/admit-card", icon: FileText },
   { title: "সিট প্ল্যান", path: "/seat-plan", icon: Map },
-  { title: "প্রত্যয়ন পত্র", path: "/certificate", icon: FileBadge },
-  { title: "ট্রান্সফার সার্টিফিকেট", path: "/transfer-certificate", icon: FileBadge },
+  
   { 
     title: "ফলাফল মডিউল", 
     icon: FileSpreadsheet,

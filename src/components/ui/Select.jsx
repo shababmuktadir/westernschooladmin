@@ -1,43 +1,61 @@
-import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Check } from "lucide-react";
+import React, { forwardRef } from "react";
+import { ChevronDown } from "lucide-react";
 
-export default function Select({ options, value, onChange, placeholder = "Select option", error }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+const Select = forwardRef(({ 
+  label, 
+  error, 
+  options = [], 
+  className = "", 
+  fullWidth = true,
+  placeholder = "Select an option",
+  id,
+  ...props 
+}, ref) => {
+  const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex justify-between items-center px-4 py-2 bg-white dark:bg-slate-800 border ${error ? "border-red-500" : "border-slate-300 dark:border-slate-700"} rounded-lg text-sm text-left focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none`}
-      >
-        <span className={value ? "text-slate-900 dark:text-slate-100" : "text-slate-400"}>
-          {value || placeholder}
-        </span>
-        <ChevronDown className="w-4 h-4 text-slate-500" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto custom-scrollbar">
-          {options.map((opt) => (
-            <div
-              key={opt}
-              onClick={() => { onChange(opt); setIsOpen(false); }}
-              className="px-4 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-slate-200 flex justify-between items-center"
-            >
-              {opt}
-              {value === opt && <Check className="w-4 h-4 text-blue-600" />}
-            </div>
+    <div className={`${fullWidth ? "w-full" : "w-auto"} ${className}`}>
+      {label && (
+        <label htmlFor={selectId} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        <select
+          id={selectId}
+          ref={ref}
+          className={`
+            appearance-none block w-full rounded-lg border px-3 py-2 text-sm transition-colors
+            bg-white text-slate-900 border-slate-300 
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+            dark:bg-slate-900 dark:border-slate-700 dark:text-white
+            dark:focus:ring-blue-500 dark:focus:border-blue-500
+            disabled:cursor-not-allowed disabled:opacity-50 dark:disabled:bg-slate-800
+            ${error ? "border-red-500 focus:ring-red-500 focus:border-red-500 dark:border-red-500" : ""}
+          `}
+          {...props}
+        >
+          {placeholder && (
+            <option value="" disabled className="dark:bg-slate-800 text-slate-500">
+              {placeholder}
+            </option>
+          )}
+          {options.map((opt, idx) => (
+            <option key={idx} value={opt.value} className="dark:bg-slate-800">
+              {opt.label}
+            </option>
           ))}
+        </select>
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+          <ChevronDown className="h-4 w-4" />
         </div>
+      </div>
+      {error && (
+        <p className="mt-1.5 text-sm text-red-500 dark:text-red-400">{error}</p>
       )}
     </div>
   );
-}
+});
+
+Select.displayName = "Select";
+export default Select;
