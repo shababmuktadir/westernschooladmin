@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Settings, UserPlus, Sun, Moon, Circle } from "lucide-react";
+import { LogOut, Settings, UserPlus, Sun, Moon, Circle, MoreHorizontal } from "lucide-react";
 import { SIDEBAR_MENU } from "@/constants/sidebar";
-import { appConfig } from "@/config/appConfig";
 import Avatar from "@/components/ui/Avatar"; 
 
 const CUSTOM_LOGO_URL = "https://res.cloudinary.com/do1dejkkk/image/upload/v1778605133/western_logo_hg9fji_1_vojrqz_1_zjiw5m.png";
@@ -21,7 +20,7 @@ const getLeafItems = (item) => {
   return leaves;
 };
 
-// ফ্ল্যাট মেনু আইটেম কম্পোনেন্ট (নো ড্রপডাউন, নো ব্যাকগ্রাউন্ড হোভার)
+// মেনু আইটেম কম্পোনেন্ট (ক্লিন এবং বড় ফন্ট ডিজাইন)
 const FlatMenuItem = ({ item }) => {
   const Icon = item.icon || Circle; 
 
@@ -29,27 +28,33 @@ const FlatMenuItem = ({ item }) => {
     <NavLink
       to={item.path}
       className={({ isActive }) =>
-        `relative flex items-center gap-4 w-full py-2.5 px-6 text-sm transition-all group font-sans tracking-wide
+        `flex items-center justify-between w-full py-2.5 px-3.5 mx-2 rounded-xl text-[15px] font-medium transition-colors font-sans
         ${isActive 
-          ? "text-purple-600 dark:text-blue-400 font-semibold" 
-          : "text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-blue-400"
+          ? "bg-slate-100 dark:bg-[#2A3143] text-slate-900 dark:text-white" 
+          : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#242A38] hover:text-slate-900 dark:hover:text-white"
         }`
       }
     >
       {({ isActive }) => (
         <>
-          {/* Active Left Indicator Bar */}
-          {isActive && (
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-purple-600 dark:bg-blue-400 rounded-r-md shadow-[2px_0_8px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_8px_rgba(96,165,250,0.3)]"></div>
-          )}
+          <div className="flex items-center gap-3.5 truncate">
+            <Icon 
+              className={`w-5 h-5 shrink-0 ${
+                isActive 
+                  ? "text-slate-900 dark:text-white" 
+                  : "text-slate-500 dark:text-slate-400"
+              }`} 
+              strokeWidth={2} 
+            />
+            <span className="truncate">{item.title}</span>
+          </div>
           
-          <Icon 
-            className={`w-4 h-4 transition-colors shrink-0 ${
-              isActive ? "text-purple-600 dark:text-blue-400" : "text-slate-400 group-hover:text-purple-600 dark:group-hover:text-blue-400"
-            }`} 
-            strokeWidth={isActive ? 2.5 : 1.75} 
-          />
-          <span className="truncate text-left">{item.title}</span>
+          {/* ব্যাজ সাপোর্ট (যদি item.badge থাকে) */}
+          {item.badge && (
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-slate-100 dark:bg-[#343D52] text-slate-500 dark:text-slate-300 shrink-0">
+              {item.badge}
+            </span>
+          )}
         </>
       )}
     </NavLink>
@@ -62,19 +67,20 @@ export default function Sidebar({ isOpen = true }) {
   const settingsRef = useRef(null);
   const navigate = useNavigate();
 
-  // Dark Mode State
+  // ডার্ক মোড স্টেট
   const [isDarkMode, setIsDarkMode] = useState(
     document.documentElement.classList.contains("dark")
   );
 
+  // ইউজারের প্রোফাইলে আপনার দেওয়া লিংকটি যুক্ত করা হয়েছে
   const user = {
-    displayName: "Admin User", 
-    email: "admin@westernschool.edu.bd",
-    photoURL: null
+    displayName: "Shabab", 
+    email: "@wsc_admin",
+    photoURL: "https://res.cloudinary.com/do1dejkkk/image/upload/v1781464021/muktadir_shabab_o3tihe.jpg"
   }; 
 
   const handleLogout = () => {
-    alert("লগআউট করা হয়েছে!");
+    alert("লগআউট করা হয়েছে!");
   };
 
   const handleAddAdmin = () => {
@@ -92,7 +98,7 @@ export default function Sidebar({ isOpen = true }) {
     }
   };
 
-  // ক্লিক আউটসাইড
+  // বাইরে ক্লিক করলে পপআপ বন্ধ করার জন্য
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (settingsRef.current && !settingsRef.current.contains(event.target)) {
@@ -104,52 +110,50 @@ export default function Sidebar({ isOpen = true }) {
   }, []);
 
   return (
-    <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-white dark:bg-black border-r border-slate-200 dark:border-white/10 flex flex-col transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+    <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 h-screen bg-white dark:bg-[#1C212B] border-r border-slate-100 dark:border-white/5 flex flex-col transition-transform duration-300 shadow-xl lg:shadow-none ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
       
-      {/* 1. Logo & School Name */}
-      <div className="h-[72px] flex items-center px-6 shrink-0 gap-3 mt-2">
-        <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center shrink-0 shadow-sm overflow-hidden p-0.5">
+      {/* ১. লোগো এবং স্কুলের নাম (স্বচ্ছ ব্যাকগ্রাউন্ড এবং বড় সাইজ) */}
+      <div className="flex items-center gap-3 px-6 pt-7 pb-5 shrink-0">
+        <div className="w-12 h-12 flex items-center justify-center shrink-0 bg-transparent">
           <img 
             src={CUSTOM_LOGO_URL} 
-            alt="Logo" 
-            className="w-full h-full object-contain rounded-full bg-white" 
+            alt="WSC Logo" 
+            className="w-full h-full object-contain drop-shadow-sm" 
           />
         </div>
-        <div className="overflow-hidden flex-1">
-          <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white truncate font-sans">
-            {appConfig?.schoolName || "Western School"}
-          </h2>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-sans">
-            Management System
-          </p>
-        </div>
+        <h2 className="text-[19px] font-bold text-slate-900 dark:text-white uppercase tracking-wide font-sans">
+          WSC
+        </h2>
       </div>
 
-      {/* 2. Flat Menu Navigation (No Dropdowns, Just Dividers) */}
-      <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+      {/* ২. ফ্ল্যাট মেনু নেভিগেশন */}
+      <nav className="flex-1 px-2 py-2 overflow-y-auto custom-scrollbar flex flex-col gap-1">
         {SIDEBAR_MENU.map((item, index) => {
           
           const leaves = getLeafItems(item);
           
-          // যদি সাব-মেনু না থাকে (যেমন- ড্যাশবোর্ড)
+          // যদি সাব-মেনু না থাকে
           if (!item.subItems || item.subItems.length === 0) {
-            return <FlatMenuItem key={index} item={item} />;
+            return (
+              <div key={index} className="mb-2">
+                <FlatMenuItem item={item} />
+              </div>
+            );
           }
 
-          // যদি সাব-মেনু থাকে, তবে ডিভাইডার দিয়ে রেন্ডার করবে
+          // যদি সাব-মেনু থাকে, তবে সেকশন টাইটেল দিয়ে রেন্ডার করবে
           return (
-            <div key={index} className="mb-2">
+            <div key={index} className="mb-4 mt-2">
               
-              {/* Divider & Section Header */}
-              <div className="px-6 mt-4 mb-3 flex items-center gap-3">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest whitespace-nowrap">
+              {/* সেকশন হেডার */}
+              <div className="px-4 mb-3">
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                   {item.title}
                 </span>
-                <div className="h-px bg-slate-200 dark:bg-white/10 flex-1"></div>
               </div>
               
-              {/* All Nested Links rendered flat */}
-              <div className="flex flex-col gap-0.5">
+              {/* ভেতরের লিংকগুলো */}
+              <div className="flex flex-col gap-1">
                 {leaves.map((leaf, idx) => (
                   <FlatMenuItem key={`${index}-${idx}`} item={leaf} />
                 ))}
@@ -160,77 +164,74 @@ export default function Sidebar({ isOpen = true }) {
         })}
       </nav>
       
-      {/* 3. Divider line */}
-      <div className="px-6">
-        <div className="w-full h-px bg-slate-200 dark:bg-white/10"></div>
-      </div>
-      
-      {/* 4. Profile & Settings Section */}
+      {/* ৩. প্রোফাইল এবং সেটিংস সেকশন */}
       <div className="relative shrink-0 font-sans mt-2 mb-4 px-4" ref={settingsRef}>
         
-        {/* Settings Popover */}
+        {/* পপওভার মেনু */}
         {showSettingsMenu && (
-          <div className="absolute bottom-full right-4 w-52 mb-2 animate-in fade-in zoom-in-95 duration-200 z-50">
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden p-1.5">
+          <div className="absolute bottom-full right-4 w-56 mb-2 animate-in fade-in zoom-in-95 duration-200 z-50">
+            <div className="bg-white dark:bg-[#2A3143] border border-slate-200 dark:border-white/5 rounded-2xl shadow-xl overflow-hidden p-1.5">
               
-              <div className="px-3 py-2 border-b border-slate-100 dark:border-white/10 mb-1">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Account</p>
-                <p className="text-sm font-semibold text-slate-800 dark:text-white truncate" title={user?.email}>{user?.email}</p>
+              <div className="flex flex-col gap-0.5">
+                <button 
+                  onClick={handleThemeToggle}
+                  className="w-full flex items-center px-3 py-2 text-[14px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#343D52] rounded-xl transition-all"
+                >
+                  {isDarkMode ? <Sun className="w-4 h-4 mr-3" /> : <Moon className="w-4 h-4 mr-3" />} 
+                  {isDarkMode ? "লাইট মোড" : "ডার্ক মোড"}
+                </button>
+
+                <button 
+                  onClick={handleAddAdmin}
+                  className="w-full flex items-center px-3 py-2 text-[14px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#343D52] rounded-xl transition-all"
+                >
+                  <UserPlus className="w-4 h-4 mr-3" /> নতুন এডমিন
+                </button>
               </div>
-
-              {/* Dark Mode Toggle */}
-              <button 
-                onClick={handleThemeToggle}
-                className="w-full flex items-center px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-purple-600 dark:hover:text-blue-400 transition-colors mb-1"
-              >
-                {isDarkMode ? <Sun className="w-4 h-4 mr-3 text-amber-500" /> : <Moon className="w-4 h-4 mr-3 text-slate-400" />} 
-                {isDarkMode ? "লাইট মোড" : "ডার্ক মোড"}
-              </button>
-
-              <button 
-                onClick={handleAddAdmin}
-                className="w-full flex items-center px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-purple-600 dark:hover:text-blue-400 transition-colors mb-1"
-              >
-                <UserPlus className="w-4 h-4 mr-3" /> নতুন এডমিন
-              </button>
 
               <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
 
               <button 
                 onClick={handleLogout}
-                className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                className="w-full flex items-center px-3 py-2 text-[14px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"
               >
                 <LogOut className="w-4 h-4 mr-3" /> লগআউট
               </button>
-
             </div>
           </div>
         )}
 
-        {/* User Info Bar (No background hover) */}
-        <div className="p-2 flex items-center gap-3">
-          <div className="flex items-center gap-3 flex-1 overflow-hidden">
-            <Avatar 
-              src={user?.photoURL} 
-              fallback={user?.displayName || "Admin"} 
-              size="sm" 
-              className="shrink-0"
-            />
-            <div className="overflow-hidden flex-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                {user?.displayName || "Admin"}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-500 truncate">
-                Super Admin
-              </p>
-            </div>
+        {/* ইউজার ইনফো বার (কার্ড স্টাইল) */}
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-[#141821] transition-colors">
+          
+          {/* Avatar Updated */}
+          <Avatar 
+            src={user?.photoURL} 
+            fallback={user?.displayName || "এডমিন"} 
+            size="sm" 
+            className="shrink-0 rounded-full w-9 h-9 object-cover"
+          />
+          
+          <div className="overflow-hidden flex-1">
+            <p className="text-[14px] font-semibold text-slate-900 dark:text-white truncate">
+              {user?.displayName || "WSC Admin"}
+            </p>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 truncate">
+              {user?.email}
+            </p>
           </div>
 
+          {/* শুধুমাত্র থ্রি-ডট আইকনে ক্লিক করলেই পপআপ ওপেন হবে */}
           <button 
             onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-            className={`p-2 rounded-lg transition-colors shrink-0 ${showSettingsMenu ? "text-purple-600 dark:text-blue-400" : "text-slate-400 hover:text-purple-600 dark:hover:text-blue-400"}`}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+              showSettingsMenu 
+                ? "bg-slate-200 dark:bg-[#2A3143] text-slate-900 dark:text-white" 
+                : "text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-[#2A3143] hover:text-slate-900 dark:hover:text-white"
+            }`}
+            aria-label="Settings Menu"
           >
-            <Settings className={`w-4 h-4 transition-transform duration-300 ${showSettingsMenu ? "rotate-90" : ""}`} />
+            <MoreHorizontal className="w-5 h-5" />
           </button>
         </div>
 
