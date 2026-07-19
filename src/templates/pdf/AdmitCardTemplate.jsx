@@ -31,12 +31,13 @@ const CLASS_TEACHER_SIGNS = {
 
 const PRINCIPAL_SIGN = "https://res.cloudinary.com/do1dejkkk/image/upload/v1776331870/principal_sign-removebg-preview_pj4jrj.png";
 
-// Theme Colors from your new image
+// New Theme Colors
 const COLORS = {
-  navy: '#09093b',
-  yellow: '#FDD65B',
-  blueBadge: '#24619B',
+  navy: '#0b0c35',
+  yellow: '#fcd352',
+  blueBadge: '#225d97',
   black: '#000000',
+  white: '#fcfcfc', // Slightly off-white for professional print look
 };
 
 const styles = StyleSheet.create({
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navy,
     width: '100%',
     height: '100%',
-    padding: 15,
+    padding: 12,
     paddingTop: 45, // Leave space for the logo overlapping
     position: 'relative',
   },
@@ -64,9 +65,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.yellow,
     width: '100%',
     height: '100%',
-    borderRadius: 25,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     position: 'relative',
-    paddingTop: 35, // Space for the school name below the logo
+    paddingTop: 32, 
   },
   // --- Logo Section (Overlapping) ---
   logoContainer: {
@@ -78,66 +82,78 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   logo: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#fff', // Optional: white background for logo if it's transparent
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    backgroundColor: '#fff',
   },
   // --- Typography ---
   schoolName: {
-    fontSize: 18,
-    fontWeight: 'extrabold',
+    fontFamily: 'Helvetica-Bold', // Bold Corporate Font
+    fontSize: 20,
     color: COLORS.black,
     textAlign: 'center',
-    marginBottom: 20,
+    letterSpacing: -0.8, // Creates the "Collaps" / Condensed feel
+    marginBottom: 15,
   },
   // --- Admit Card Blue Badge ---
   admitBadge: {
     backgroundColor: COLORS.blueBadge,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 20,
     borderTopRightRadius: 25,
     borderBottomRightRadius: 25,
     position: 'absolute',
-    top: 75,
-    left: -15, // Pulls it outside the yellow box slightly
-    width: 160,
+    top: 65,
+    left: -12, // Pulls it outside the yellow box slightly
+    width: 170,
+    zIndex: 5,
   },
   admitBadgeText: {
+    fontFamily: 'Helvetica-Bold',
     color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'extrabold',
+    fontSize: 22,
+    letterSpacing: 0.5,
   },
   // --- Info Section ---
   infoContainer: {
-    marginTop: 65, // Push down below the badge
+    marginTop: 60, // Push down below the badge
     paddingHorizontal: 25,
+    zIndex: 2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 7,
   },
   label: {
-    width: 70,
+    fontFamily: 'Times-Bold', // Corporate Serif Font
+    width: 75,
     fontSize: 14,
-    fontWeight: 'extrabold',
     color: COLORS.black,
   },
   value: {
+    fontFamily: 'Times-Roman', // Standard Professional Serif
     flex: 1,
     fontSize: 14,
     color: COLORS.black,
+    textTransform: 'capitalize',
   },
-  // --- Footer Section ---
-  footer: {
+  // --- White Box (Signatures Section) ---
+  whiteBox: {
     position: 'absolute',
-    bottom: 25,
-    left: 20,
-    right: 20,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 75,
+    backgroundColor: COLORS.white,
+    borderRadius: 12, // Rounded corners on all sides
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    zIndex: 3,
   },
   signBlock: {
     alignItems: 'center',
@@ -153,15 +169,16 @@ const styles = StyleSheet.create({
     height: 25,
   },
   signText: {
+    fontFamily: 'Times-Bold',
     fontSize: 10,
-    fontWeight: 'extrabold',
     color: COLORS.black,
   },
 });
 
 export default function AdmitCardTemplate({ students, examData, schoolConfig }) {
   const pages = chunkArray(students, 4);
-  const formattedDate = examData.examDate ? format(new Date(examData.examDate), "dd MMM, yyyy") : "N/A";
+  // Using 'dd MMMM yyyy' to match the image output exactly (e.g. 30 July 2026)
+  const formattedDate = examData.examDate ? format(new Date(examData.examDate), "dd MMMM yyyy") : "N/A";
 
   return (
     <Document>
@@ -225,8 +242,8 @@ export default function AdmitCardTemplate({ students, examData, schoolConfig }) 
                       </View>
                     </View>
 
-                    {/* Footer (Signatures & Text) */}
-                    <View style={styles.footer}>
+                    {/* White Bottom Box for Signatures */}
+                    <View style={styles.whiteBox}>
                       <View style={styles.signBlock}>
                         {classSign ? (
                           <Image src={classSign} style={styles.signImg} />
