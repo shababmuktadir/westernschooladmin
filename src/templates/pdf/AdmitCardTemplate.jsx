@@ -1,3 +1,4 @@
+import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { format } from "date-fns";
 
@@ -9,7 +10,7 @@ const chunkArray = (arr, size) => {
   return chunks;
 };
 
-// Updated with new SVG Links and multiple format support to prevent missing signatures
+// Signatures configuration
 const CLASS_TEACHER_SIGNS = {
   "Play": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308689/aysha_mam_icrrpz.png",
   "Nursery": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308687/rimi_qgmydc.png",
@@ -24,7 +25,6 @@ const CLASS_TEACHER_SIGNS = {
   "Class 4": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308687/sharmin_mam_warj7u.png",
   "5": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308688/nandi_mam_fswkb1.png",
   "Class 5": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308688/nandi_mam_fswkb1.png",
-  // Fallbacks for upper classes
   "6": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
   "Class 6": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
   "7": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
@@ -39,6 +39,14 @@ const CLASS_TEACHER_SIGNS = {
 
 const PRINCIPAL_SIGN = "https://res.cloudinary.com/do1dejkkk/image/upload/v1776331870/principal_sign-removebg-preview_pj4jrj.png";
 
+// Theme Colors
+const COLORS = {
+  navy: '#13203A',
+  gold: '#EAB308',
+  brown: '#4A3219',
+  lightGold: '#FDE047',
+};
+
 const styles = StyleSheet.create({
   page: {
     padding: 10,
@@ -47,134 +55,176 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   innerCard: {
-    border: '2pt solid #0f172a',
+    backgroundColor: COLORS.navy,
     height: '100%',
-    backgroundColor: '#ffffff',
     display: 'flex',
     flexDirection: 'column',
-  },
-  headerBg: {
-    backgroundColor: '#1e3a8a', 
+    borderLeft: `4pt solid ${COLORS.gold}`,
     padding: 10,
+    position: 'relative',
+  },
+  // --- Header Section ---
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottom: '2pt solid #0f172a',
+    flex: 1,
   },
   logo: {
-    width: 45,
-    height: 45,
-    marginRight: 12,
-    backgroundColor: '#ffffff',
-    padding: 2,
-    borderRadius: 4,
+    width: 40,
+    height: 40,
+    marginRight: 8,
   },
-  schoolInfo: {
-    flex: 1,
-  },
-  schoolName: {
-    fontSize: 13,
+  schoolNameText: {
+    fontSize: 14,
     fontWeight: 'extrabold',
-    color: '#ffffff',
+    color: COLORS.gold,
     textTransform: 'uppercase',
   },
-  schoolAddress: {
-    fontSize: 9,
-    color: '#e2e8f0', 
+  schoolAddressText: {
+    fontSize: 8,
+    color: COLORS.lightGold,
     marginTop: 2,
   },
-  admitTitleWrapper: {
-    backgroundColor: '#f1f5f9', 
-    borderBottom: '1pt solid #cbd5e1',
-    paddingVertical: 5,
-    alignItems: 'center',
+  admitBadge: {
+    backgroundColor: COLORS.gold,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 15,
+    borderTopRightRadius: 5,
+    marginLeft: 10,
   },
-  admitTitle: {
-    fontSize: 12,
-    fontWeight: 'black',
-    color: '#0f172a',
-    letterSpacing: 2,
+  admitBadgeText: {
+    fontSize: 14,
+    fontWeight: 'extrabold',
+    color: COLORS.navy,
+    letterSpacing: 1,
   },
-  examName: {
-    fontSize: 10,
-    color: '#1e3a8a', 
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  bodyContent: {
+  // --- Main Body (Brown Box) ---
+  brownBox: {
+    backgroundColor: COLORS.brown,
+    borderRadius: 12,
     padding: 12,
     flex: 1,
-  },
-  dataGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  infoCol: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     marginBottom: 8,
-    justifyContent: 'space-between', 
-  },
-  dataBoxFull: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  dataBoxThird: {
-    width: '31%', 
-    marginBottom: 10,
-  },
-  dataBoxHalf: {
-    width: '48%', 
-    marginBottom: 10,
   },
   label: {
+    width: 80,
     fontSize: 9,
-    color: '#475569',
-    textTransform: 'uppercase',
     fontWeight: 'bold',
+    color: COLORS.gold,
+    textTransform: 'uppercase',
+  },
+  colon: {
+    fontSize: 9,
+    color: COLORS.gold,
+    marginRight: 4,
   },
   value: {
-    fontSize: 11,
-    fontWeight: 'extrabold',
-    color: '#000000', 
-    borderBottom: '1pt solid #94a3b8',
+    flex: 1,
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.gold,
+    borderBottom: `1pt solid ${COLORS.gold}`,
     paddingBottom: 2,
-    marginTop: 2,
   },
+  // --- Right Side (Student ID) ---
+  idCol: {
+    width: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idBox: {
+    border: `1pt solid ${COLORS.gold}`,
+    borderRadius: 6,
+    padding: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  idLabel: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: COLORS.gold,
+    marginBottom: 5,
+  },
+  idValue: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.gold,
+    borderBottom: `1pt dashed ${COLORS.gold}`,
+    width: '100%',
+    textAlign: 'center',
+    paddingBottom: 2,
+  },
+  // --- Footer ---
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginTop: 'auto',
-    paddingHorizontal: 15,
-    paddingBottom: 15,
+    marginTop: 10,
+    paddingHorizontal: 5,
   },
-  signatureBox: {
+  signBlock: {
     alignItems: 'center',
-    width: 120, 
+    width: 90,
   },
-  signatureImage: {
-    width: 140, 
-    height: 40, 
+  signImg: {
+    width: 80,
+    height: 30,
     objectFit: 'contain',
     marginBottom: 2,
   },
-  signaturePlaceholder: {
-    height: 40, 
+  signPlaceholder: {
+    height: 30,
   },
-  signatureLine: {
+  signLine: {
     width: '100%',
-    borderTop: '1pt solid #000000',
+    borderTop: `1pt solid ${COLORS.gold}`,
+    marginTop: 2,
   },
-  signatureText: {
-    fontSize: 9,
+  signText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: COLORS.gold,
     marginTop: 4,
-    color: '#000000',
-    fontWeight: 'extrabold',
+    textTransform: 'uppercase',
+  },
+  wishBox: {
+    border: `1pt solid ${COLORS.gold}`,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  wishText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: COLORS.gold,
+    textAlign: 'center',
   },
 });
 
 const getCutMarkStyle = (idx) => {
-  const borderLine = '1.5pt dashed #475569';
+  const borderLine = '1pt dashed #94a3b8';
   return {
     width: '50%',
     height: '50%',
-    padding: 10,
+    padding: 8,
     borderRight: idx === 0 || idx === 2 ? borderLine : 'none',
     borderBottom: idx === 0 || idx === 1 ? borderLine : 'none',
   };
@@ -192,91 +242,102 @@ export default function AdmitCardTemplate({ students, examData, schoolConfig }) 
           {pageStudents.map((student, idx) => {
             const safeClass = student.class ? student.class.trim() : "";
             const classSign = CLASS_TEACHER_SIGNS[safeClass] || null;
+            const studentName = student.fullName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || "N/A";
 
             return (
               <View key={idx} style={getCutMarkStyle(idx)}>
                 <View style={styles.innerCard}>
                   
-                  {/* Header */}
-                  <View style={styles.headerBg}>
-                    {schoolConfig?.schoolLogo && (
-                      <Image src={schoolConfig.schoolLogo} style={styles.logo} />
-                    )}
-                    <View style={styles.schoolInfo}>
-                      <Text style={styles.schoolName}>{schoolConfig?.schoolName}</Text>
-                      <Text style={styles.schoolAddress}>Didar market, Dewan bazar, chattogram</Text>
+                  {/* --- Header --- */}
+                  <View style={styles.header}>
+                    <View style={styles.headerLeft}>
+                      {schoolConfig?.schoolLogo && (
+                        <Image src={schoolConfig.schoolLogo} style={styles.logo} />
+                      )}
+                      <View>
+                        <Text style={styles.schoolNameText}>{schoolConfig?.schoolName}</Text>
+                        <Text style={styles.schoolAddressText}>123, College Road, Dhanmondi</Text>
+                        <Text style={styles.schoolAddressText}>Dhaka-1205, Bangladesh</Text>
+                      </View>
+                    </View>
+                    <View style={styles.admitBadge}>
+                      <Text style={styles.admitBadgeText}>ADMIT CARD</Text>
                     </View>
                   </View>
 
-                  {/* Title */}
-                  <View style={styles.admitTitleWrapper}>
-                    <Text style={styles.admitTitle}>ADMIT CARD</Text>
-                    <Text style={styles.examName}>{examData.examName}</Text>
-                  </View>
-
-                  {/* Body Content */}
-                  <View style={styles.bodyContent}>
-                    <View style={styles.dataGrid}>
-                      
-                      {/* Name Field - Fixed to use fullName with a fallback for old data */}
-                      <View style={styles.dataBoxFull}>
-                        <Text style={styles.label}>Student Name</Text>
-                        <Text style={styles.value}>
-                          {student.fullName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || "Name Not Found"}
-                        </Text>
+                  {/* --- Main Brown Box --- */}
+                  <View style={styles.brownBox}>
+                    <View style={styles.infoCol}>
+                      <View style={styles.row}>
+                        <Text style={styles.label}>STUDENT NAME</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.value}>{studentName}</Text>
                       </View>
                       
-                      <View style={styles.dataBoxThird}>
-                        <Text style={styles.label}>Student ID</Text>
-                        <Text style={styles.value}>{student.studentId || "N/A"}</Text>
-                      </View>
-                      <View style={styles.dataBoxThird}>
-                        <Text style={styles.label}>Class</Text>
-                        <Text style={styles.value}>{safeClass || "N/A"}</Text>
-                      </View>
-                      <View style={styles.dataBoxThird}>
-                        <Text style={styles.label}>Roll No</Text>
+                      <View style={styles.row}>
+                        <Text style={styles.label}>ROLL NO.</Text>
+                        <Text style={styles.colon}>:</Text>
                         <Text style={styles.value}>{student.rollNumber || "N/A"}</Text>
                       </View>
-
-                      <View style={styles.dataBoxHalf}>
-                        <Text style={styles.label}>Starting Date</Text>
-                        <Text style={styles.value}>{formattedDate}</Text>
+                      
+                      <View style={styles.row}>
+                        <Text style={styles.label}>CLASS</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.value}>{safeClass || "N/A"}</Text>
                       </View>
                       
-                      {/* Optional Time Field handling */}
+                      <View style={styles.row}>
+                        <Text style={styles.label}>EXAM DATE</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.value}>{formattedDate}</Text>
+                      </View>
+
                       {examData.examTime && (
-                        <View style={styles.dataBoxHalf}>
-                          <Text style={styles.label}>Time</Text>
+                        <View style={styles.row}>
+                          <Text style={styles.label}>EXAM TIME</Text>
+                          <Text style={styles.colon}>:</Text>
                           <Text style={styles.value}>{examData.examTime}</Text>
                         </View>
                       )}
                     </View>
+
+                    {/* Student ID Box */}
+                    <View style={styles.idCol}>
+                      <View style={styles.idBox}>
+                        <Text style={styles.idLabel}>STUDENT ID</Text>
+                        <Text style={styles.idValue}>{student.studentId || "N/A"}</Text>
+                      </View>
+                    </View>
                   </View>
 
-                  {/* Footer (Signatures) */}
+                  {/* --- Footer Signatures --- */}
                   <View style={styles.footer}>
-                    <View style={styles.signatureBox}>
+                    <View style={styles.signBlock}>
                       {classSign ? (
-                        <Image src={classSign} style={styles.signatureImage} />
+                        <Image src={classSign} style={styles.signImg} />
                       ) : (
-                        <View style={styles.signaturePlaceholder} />
+                        <View style={styles.signPlaceholder} />
                       )}
-                      <View style={styles.signatureLine} />
-                      <Text style={styles.signatureText}>Class Teacher</Text>
+                      <View style={styles.signLine} />
+                      <Text style={styles.signText}>CLASS TEACHER</Text>
                     </View>
 
-                    <View style={styles.signatureBox}>
+                    <View style={styles.wishBox}>
+                      <Text style={styles.wishText}>BEST OF LUCK</Text>
+                      <Text style={styles.wishText}>FOR YOUR EXAM</Text>
+                    </View>
+
+                    <View style={styles.signBlock}>
                       {PRINCIPAL_SIGN ? (
-                        <Image src={PRINCIPAL_SIGN} style={styles.signatureImage} />
+                        <Image src={PRINCIPAL_SIGN} style={styles.signImg} />
                       ) : (
-                        <View style={styles.signaturePlaceholder} />
+                        <View style={styles.signPlaceholder} />
                       )}
-                      <View style={styles.signatureLine} />
-                      <Text style={styles.signatureText}>Principal</Text>
+                      <View style={styles.signLine} />
+                      <Text style={styles.signText}>PRINCIPAL</Text>
                     </View>
                   </View>
-                  
+
                 </View>
               </View>
             );

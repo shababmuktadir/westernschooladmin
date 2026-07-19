@@ -1,6 +1,6 @@
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
+    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
   try {
@@ -12,13 +12,15 @@ exports.handler = async (event, context) => {
     const url = `http://bulksmsbd.net/api/smsapi?api_key=${API_KEY}&type=text&number=${number}&senderid=${SENDER_ID}&message=${encodedMessage}`;
 
     const response = await fetch(url);
-    const data = await response.json();
+    const data = await response.text(); 
+    // BulkSMSBD রেসপন্স কোড (যেমন: 202) টেক্সট বা JSON হিসেবে দিতে পারে।
 
     return {
       statusCode: 200,
-      body: JSON.stringify(data),
+      body: JSON.stringify({ result: data, success: data.includes("202") || data.includes("Success") }),
     };
   } catch (error) {
+    console.error("SMS Sending Error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Failed to send SMS" }),

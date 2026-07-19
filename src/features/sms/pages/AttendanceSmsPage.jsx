@@ -21,9 +21,27 @@ export default function AttendanceSmsPage() {
   }, []);
 
   const fetchBalance = async () => {
-    setBalance("...");
-    const bal = await checkSmsBalance();
-    setBalance(bal);
+    setBalance("Loading...");
+    try {
+      const data = await checkSmsBalance();
+      
+      // ডেটা যদি অবজেক্ট হয় (যেমন: {balance: "437.63"}) বা সরাসরি নাম্বার/স্ট্রিং হয়
+      let balValue = 0;
+      
+      if (typeof data === 'object' && data !== null) {
+        // যদি রেসপন্স অবজেক্ট হয়, তবে ভেতরে ব্যালেন্স কী (key) খুঁজবে
+        balValue = data.balance || data.result || 0;
+      } else {
+        balValue = data;
+      }
+
+      // NaN চেক এবং রাউন্ডিং
+      const numericBal = parseFloat(balValue);
+      setBalance(!isNaN(numericBal) ? numericBal.toFixed(2) : "0.00");
+      
+    } catch (error) {
+      setBalance("0.00");
+    }
   };
 
   const fetchStudents = async () => {
