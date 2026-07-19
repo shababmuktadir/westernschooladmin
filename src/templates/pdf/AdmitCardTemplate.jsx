@@ -26,209 +26,138 @@ const CLASS_TEACHER_SIGNS = {
   "5": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308688/nandi_mam_fswkb1.png",
   "Class 5": "https://res.cloudinary.com/do1dejkkk/image/upload/v1784308688/nandi_mam_fswkb1.png",
   "6": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "Class 6": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "7": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
   "Class 7": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "8": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "Class 8": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "9": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "Class 9": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "10": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
-  "Class 10": "https://res.cloudinary.com/do1dejkkk/image/upload/v1776881851/Gemini_Generated_Image_rkl605rkl605rkl6_nooehi_1_1_v9wgur.png",
 };
 
 const PRINCIPAL_SIGN = "https://res.cloudinary.com/do1dejkkk/image/upload/v1776331870/principal_sign-removebg-preview_pj4jrj.png";
 
-// Theme Colors
+// Theme Colors from your new image
 const COLORS = {
-  navy: '#13203A',
-  gold: '#EAB308',
-  brown: '#4A3219',
-  lightGold: '#FDE047',
+  navy: '#09093b',
+  yellow: '#FDD65B',
+  blueBadge: '#24619B',
+  black: '#000000',
 };
 
 const styles = StyleSheet.create({
   page: {
-    padding: 10,
     backgroundColor: '#ffffff',
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  innerCard: {
-    backgroundColor: COLORS.navy,
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    borderLeft: `4pt solid ${COLORS.gold}`,
+  cardWrapper: {
+    width: '50%',
+    height: '50%',
     padding: 10,
+    borderRight: '1pt dashed #ccc',
+    borderBottom: '1pt dashed #ccc',
+  },
+  navyBackground: {
+    backgroundColor: COLORS.navy,
+    width: '100%',
+    height: '100%',
+    padding: 15,
+    paddingTop: 45, // Leave space for the logo overlapping
     position: 'relative',
   },
-  // --- Header Section ---
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+  yellowBox: {
+    backgroundColor: COLORS.yellow,
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+    position: 'relative',
+    paddingTop: 35, // Space for the school name below the logo
   },
-  headerLeft: {
-    flexDirection: 'row',
+  // --- Logo Section (Overlapping) ---
+  logoContainer: {
+    position: 'absolute',
+    top: -40, // Pulls the logo up to overlap the navy and yellow
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    flex: 1,
+    zIndex: 10,
   },
   logo: {
-    width: 40,
-    height: 40,
-    marginRight: 8,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#fff', // Optional: white background for logo if it's transparent
   },
-  schoolNameText: {
-    fontSize: 14,
+  // --- Typography ---
+  schoolName: {
+    fontSize: 18,
     fontWeight: 'extrabold',
-    color: COLORS.gold,
-    textTransform: 'uppercase',
+    color: COLORS.black,
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  schoolAddressText: {
-    fontSize: 8,
-    color: COLORS.lightGold,
-    marginTop: 2,
-  },
+  // --- Admit Card Blue Badge ---
   admitBadge: {
-    backgroundColor: COLORS.gold,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderBottomLeftRadius: 15,
-    borderTopRightRadius: 5,
-    marginLeft: 10,
+    backgroundColor: COLORS.blueBadge,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderTopRightRadius: 25,
+    borderBottomRightRadius: 25,
+    position: 'absolute',
+    top: 75,
+    left: -15, // Pulls it outside the yellow box slightly
+    width: 160,
   },
   admitBadgeText: {
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: 20,
     fontWeight: 'extrabold',
-    color: COLORS.navy,
-    letterSpacing: 1,
   },
-  // --- Main Body (Brown Box) ---
-  brownBox: {
-    backgroundColor: COLORS.brown,
-    borderRadius: 12,
-    padding: 12,
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  infoCol: {
-    flex: 1,
-    paddingRight: 10,
+  // --- Info Section ---
+  infoContainer: {
+    marginTop: 65, // Push down below the badge
+    paddingHorizontal: 25,
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     marginBottom: 8,
   },
   label: {
-    width: 80,
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    textTransform: 'uppercase',
-  },
-  colon: {
-    fontSize: 9,
-    color: COLORS.gold,
-    marginRight: 4,
+    width: 70,
+    fontSize: 14,
+    fontWeight: 'extrabold',
+    color: COLORS.black,
   },
   value: {
     flex: 1,
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    borderBottom: `1pt solid ${COLORS.gold}`,
-    paddingBottom: 2,
+    fontSize: 14,
+    color: COLORS.black,
   },
-  // --- Right Side (Student ID) ---
-  idCol: {
-    width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  idBox: {
-    border: `1pt solid ${COLORS.gold}`,
-    borderRadius: 6,
-    padding: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  idLabel: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    marginBottom: 5,
-  },
-  idValue: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    borderBottom: `1pt dashed ${COLORS.gold}`,
-    width: '100%',
-    textAlign: 'center',
-    paddingBottom: 2,
-  },
-  // --- Footer ---
+  // --- Footer Section ---
   footer: {
+    position: 'absolute',
+    bottom: 25,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginTop: 10,
-    paddingHorizontal: 5,
   },
   signBlock: {
     alignItems: 'center',
     width: 90,
   },
   signImg: {
-    width: 80,
-    height: 30,
+    width: 70,
+    height: 25,
     objectFit: 'contain',
     marginBottom: 2,
   },
   signPlaceholder: {
-    height: 30,
-  },
-  signLine: {
-    width: '100%',
-    borderTop: `1pt solid ${COLORS.gold}`,
-    marginTop: 2,
+    height: 25,
   },
   signText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    marginTop: 4,
-    textTransform: 'uppercase',
-  },
-  wishBox: {
-    border: `1pt solid ${COLORS.gold}`,
-    borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  wishText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: COLORS.gold,
-    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: 'extrabold',
+    color: COLORS.black,
   },
 });
-
-const getCutMarkStyle = (idx) => {
-  const borderLine = '1pt dashed #94a3b8';
-  return {
-    width: '50%',
-    height: '50%',
-    padding: 8,
-    borderRight: idx === 0 || idx === 2 ? borderLine : 'none',
-    borderBottom: idx === 0 || idx === 1 ? borderLine : 'none',
-  };
-};
 
 export default function AdmitCardTemplate({ students, examData, schoolConfig }) {
   const pages = chunkArray(students, 4);
@@ -245,99 +174,79 @@ export default function AdmitCardTemplate({ students, examData, schoolConfig }) 
             const studentName = student.fullName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || "N/A";
 
             return (
-              <View key={idx} style={getCutMarkStyle(idx)}>
-                <View style={styles.innerCard}>
+              <View key={idx} style={styles.cardWrapper}>
+                
+                {/* Outer Navy Blue Box */}
+                <View style={styles.navyBackground}>
                   
-                  {/* --- Header --- */}
-                  <View style={styles.header}>
-                    <View style={styles.headerLeft}>
+                  {/* Inner Yellow Rounded Box */}
+                  <View style={styles.yellowBox}>
+                    
+                    {/* Centered Overlapping Logo */}
+                    <View style={styles.logoContainer}>
                       {schoolConfig?.schoolLogo && (
                         <Image src={schoolConfig.schoolLogo} style={styles.logo} />
                       )}
-                      <View>
-                        <Text style={styles.schoolNameText}>{schoolConfig?.schoolName}</Text>
-                        <Text style={styles.schoolAddressText}>123, College Road, Dhanmondi</Text>
-                        <Text style={styles.schoolAddressText}>Dhaka-1205, Bangladesh</Text>
-                      </View>
                     </View>
-                    <View style={styles.admitBadge}>
-                      <Text style={styles.admitBadgeText}>ADMIT CARD</Text>
-                    </View>
-                  </View>
 
-                  {/* --- Main Brown Box --- */}
-                  <View style={styles.brownBox}>
-                    <View style={styles.infoCol}>
+                    {/* School Name */}
+                    <Text style={styles.schoolName}>{schoolConfig?.schoolName}</Text>
+
+                    {/* Left side Admit Card Badge */}
+                    <View style={styles.admitBadge}>
+                      <Text style={styles.admitBadgeText}>Admit Card</Text>
+                    </View>
+
+                    {/* Student Information Fields */}
+                    <View style={styles.infoContainer}>
                       <View style={styles.row}>
-                        <Text style={styles.label}>STUDENT NAME</Text>
-                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.label}>NAME</Text>
                         <Text style={styles.value}>{studentName}</Text>
                       </View>
                       
                       <View style={styles.row}>
-                        <Text style={styles.label}>ROLL NO.</Text>
-                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.label}>CLASS</Text>
+                        <Text style={styles.value}>{safeClass}</Text>
+                      </View>
+                      
+                      <View style={styles.row}>
+                        <Text style={styles.label}>ROLL</Text>
                         <Text style={styles.value}>{student.rollNumber || "N/A"}</Text>
                       </View>
-                      
+
                       <View style={styles.row}>
-                        <Text style={styles.label}>CLASS</Text>
-                        <Text style={styles.colon}>:</Text>
-                        <Text style={styles.value}>{safeClass || "N/A"}</Text>
+                        <Text style={styles.label}>ID</Text>
+                        <Text style={styles.value}>{student.studentId || "N/A"}</Text>
                       </View>
                       
                       <View style={styles.row}>
-                        <Text style={styles.label}>EXAM DATE</Text>
-                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.label}>DATE</Text>
                         <Text style={styles.value}>{formattedDate}</Text>
                       </View>
-
-                      {examData.examTime && (
-                        <View style={styles.row}>
-                          <Text style={styles.label}>EXAM TIME</Text>
-                          <Text style={styles.colon}>:</Text>
-                          <Text style={styles.value}>{examData.examTime}</Text>
-                        </View>
-                      )}
                     </View>
 
-                    {/* Student ID Box */}
-                    <View style={styles.idCol}>
-                      <View style={styles.idBox}>
-                        <Text style={styles.idLabel}>STUDENT ID</Text>
-                        <Text style={styles.idValue}>{student.studentId || "N/A"}</Text>
+                    {/* Footer (Signatures & Text) */}
+                    <View style={styles.footer}>
+                      <View style={styles.signBlock}>
+                        {classSign ? (
+                          <Image src={classSign} style={styles.signImg} />
+                        ) : (
+                          <View style={styles.signPlaceholder} />
+                        )}
+                        <Text style={styles.signText}>CLASS TEACHER</Text>
+                      </View>
+
+                      <View style={styles.signBlock}>
+                        {PRINCIPAL_SIGN ? (
+                          <Image src={PRINCIPAL_SIGN} style={styles.signImg} />
+                        ) : (
+                          <View style={styles.signPlaceholder} />
+                        )}
+                        <Text style={styles.signText}>PRINCIPAL</Text>
                       </View>
                     </View>
+
                   </View>
-
-                  {/* --- Footer Signatures --- */}
-                  <View style={styles.footer}>
-                    <View style={styles.signBlock}>
-                      {classSign ? (
-                        <Image src={classSign} style={styles.signImg} />
-                      ) : (
-                        <View style={styles.signPlaceholder} />
-                      )}
-                      <View style={styles.signLine} />
-                      <Text style={styles.signText}>CLASS TEACHER</Text>
-                    </View>
-
-                    <View style={styles.wishBox}>
-                      <Text style={styles.wishText}>BEST OF LUCK</Text>
-                      <Text style={styles.wishText}>FOR YOUR EXAM</Text>
-                    </View>
-
-                    <View style={styles.signBlock}>
-                      {PRINCIPAL_SIGN ? (
-                        <Image src={PRINCIPAL_SIGN} style={styles.signImg} />
-                      ) : (
-                        <View style={styles.signPlaceholder} />
-                      )}
-                      <View style={styles.signLine} />
-                      <Text style={styles.signText}>PRINCIPAL</Text>
-                    </View>
-                  </View>
-
                 </View>
               </View>
             );
