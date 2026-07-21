@@ -1,12 +1,8 @@
 [build]
+  command = "npm run build"
+  publish = "dist"
   functions = "netlify/functions"
 
 [dev]
   command = "npm run dev"
-  port = 5173
   targetPort = 5173
-  publish = "dist"
-
-[context.dev.environment]
-  SMS_API_KEY = "ASNQVx1KE4tJ0iHl0y3V"
-  SMS_SENDER_ID = "8809648907626"
