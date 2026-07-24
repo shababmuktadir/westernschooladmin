@@ -10,11 +10,11 @@ export const generateNextInvoiceNo = async () => {
       return "WSC-000001";
     }
     
-    // সর্বশেষ ডকুমেন্ট থেকে নম্বর বের করা (যদি WSC-000001 ফরমেটে থাকে)
+    // সর্বশেষ ডকুমেন্ট থেকে নম্বর বের করা
     const lastDoc = querySnapshot.docs[0].data();
     const lastInvoiceNo = lastDoc.invoiceNo || lastDoc.memoNo || "WSC-000000";
     
-    // শুধু শেষের নাম্বারটুকু আলাদা করা (যেমন: WSC-000001 থেকে 1)
+    // শুধু শেষের নাম্বারটুকু আলাদা করা
     const parts = lastInvoiceNo.split("-");
     const lastNumber = parts.length > 1 ? parseInt(parts[1], 10) : parseInt(lastInvoiceNo, 10);
     
@@ -87,9 +87,46 @@ export const saveBulkStudentFees = async (feesArray) => {
   }
 };
 
-// নতুন: নির্দিষ্ট স্টুডেন্টের সব ফি রেকর্ড পাওয়ার ফাংশন
+// নির্দিষ্ট স্টুডেন্টের সব ফি রেকর্ড পাওয়ার ফাংশন
 export const getStudentFees = async (studentId) => {
   const q = query(collection(db, "studentFees"), where("studentId", "==", studentId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+// ডেটাবেস থেকে সব ফি রেকর্ড একসাথে নিয়ে আসার ফাংশন
+export const getBulkStudentFees = async () => {
+  try {
+    const feesRef = collection(db, "studentFees"); // "fees" থেকে "studentFees" করা হয়েছে
+    const snapshot = await getDocs(feesRef);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error("Error fetching all fees for validation:", error);
+    return []; 
+  }
+};
+
+// ডাটাবেস থেকে আগের সব ফি রেকর্ড সম্পূর্ণ মুছে ফেলার ফাংশন
+export const deleteAllFees = async () => {
+  try {
+    const feesRef = collection(db, "studentFees"); // "fees" থেকে "studentFees" করা হয়েছে
+    const snapshot = await getDocs(feesRef);
+    
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((document) => {
+      batch.delete(doc(db, "studentFees", document.id)); // এখানেও "studentFees" দেওয়া হয়েছে
+    });
+
+    await batch.commit();
+    console.log("All previous fee records deleted successfully.");
+  } catch (error) {
+    console.error("Error deleting all fees:", error);
+    throw error;
+  }
 };
