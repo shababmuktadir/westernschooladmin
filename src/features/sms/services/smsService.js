@@ -1,7 +1,7 @@
 // Check Balance
 export const checkSmsBalance = async () => {
   try {
-    const response = await fetch("/.netlify/functions/checkBalance");
+    const response = await fetch("/api/checkBalance");
     if (!response.ok) throw new Error("Failed to fetch balance");
     
     const data = await response.json();
@@ -33,7 +33,7 @@ export const sendSMS = async (number, message) => {
       return { success: false, error: "Invalid phone number format" };
     }
 
-    const response = await fetch("/.netlify/functions/sendSms", {
+    const response = await fetch("/api/sendSms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ number: formattedNumber, message }),

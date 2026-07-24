@@ -1,8 +1,8 @@
-export const handler = async (event, context) => {
+export default async function handler(req, res) {
   const API_KEY = process.env.SMS_API_KEY;
   
   if (!API_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: "API Key missing" }) };
+    return res.status(500).json({ error: "API Key missing" });
   }
 
   const url = `http://bulksmsbd.net/api/getBalanceApi?api_key=${API_KEY}`;
@@ -20,12 +20,8 @@ export const handler = async (event, context) => {
       finalBalance = textData; 
     }
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ balance: finalBalance }),
-    };
+    return res.status(200).json({ balance: finalBalance });
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    return res.status(500).json({ error: error.message });
   }
-};
+}
