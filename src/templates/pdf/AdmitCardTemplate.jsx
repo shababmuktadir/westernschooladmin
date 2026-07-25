@@ -5,7 +5,7 @@ import { format } from "date-fns";
 // Register Anton font from Google Fonts
 Font.register({
   family: 'Anton',
-  src: 'https://fonts.gstatic.com/s/anton/v25/1Ptgg87LROyAm3Kz-C8CSKlvPfE.ttf',
+  src: 'https://fonts.gstatic.com/s/anton/v23/1Ptgg87LROyAm3Kz-C8CSKlv.ttf' 
 });
 
 const chunkArray = (arr, size) => {
