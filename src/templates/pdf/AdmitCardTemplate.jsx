@@ -2,10 +2,16 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer';
 import { format } from "date-fns";
 
-// Register Anton font from Google Fonts
+// Register Anton font - local file
 Font.register({
   family: 'Anton',
-  src: '/Anton-Regular.ttf' // অনলাইন লিংকের বদলে আপনার লোকাল ফাইলের পাথ
+  src: '/Anton-Regular.ttf',
+});
+
+// Register UnifrakturMaguntia font - local file for Admit Card title
+Font.register({
+  family: 'UnifrakturMaguntia',
+  src: `${window.location.origin}/UnifrakturMaguntia-Regular.ttf`,
 });
 
 const chunkArray = (arr, size) => {
@@ -103,7 +109,7 @@ const styles = StyleSheet.create({
   schoolNameContainer: {
     flex: 1,
   },
-  // Anton font, increased size for prominence
+  // Anton font for school name
   schoolName: {
     fontFamily: 'Anton',
     fontSize: 22,
@@ -127,14 +133,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeText: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Times-Roman',
     color: COLORS.white,
     fontSize: 12,
     textTransform: 'uppercase',
+    fontWeight: 'bold',
   },
+  // UnifrakturMaguntia font for "ADMIT CARD" title
   title: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 20,
+    fontFamily: 'UnifrakturMaguntia',
+    fontSize: 28,
     color: COLORS.headerNavy,
     textAlign: 'center',
     marginTop: 10,
@@ -285,6 +293,7 @@ export default function AdmitCardTemplate({ students, examData, schoolConfig }) 
                     </View>
                   </View>
 
+                  {/* ADMIT CARD - UnifrakturMaguntia font */}
                   <Text style={styles.title}>ADMIT CARD</Text>
                   <View style={styles.titleLineContainer}>
                     <View style={styles.titleLine} />
