@@ -40,13 +40,13 @@ const PRINCIPAL_SIGN = "https://res.cloudinary.com/do1dejkkk/image/upload/v17763
 // Professional blue theme
 const COLORS = {
   pageBg: '#ffe6b6',
-  cardBg: '#ffcc98',
-  headerNavy: '#0B2545',
-  accentBlue: '#133C55',
+  cardBg: '#b4cde6',
+  headerNavy: '#0000ff',
+  accentBlue: '#000000',
   badgeBlue: '#1E6091',
   white: '#FFFFFF',
   darkText: '#1A1A1A',
-  goldAccent: '#E6B422',
+  goldAccent: '#000000',
 };
 
 const styles = StyleSheet.create({
