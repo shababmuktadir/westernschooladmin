@@ -15,9 +15,13 @@ import {
   Map, 
   Presentation,
   Building2,
-  MessageSquare,   // new import
-  CalendarCheck,   // new import
-  Send             // new import
+  MessageSquare, 
+  CalendarCheck, 
+  Send,
+  Contact,           // for Teacher Directory
+  ClipboardCheck,    // for Teacher Attendance (Added comma here)
+  Search,            // for Teacher Details
+  HandCoins          // for Teacher Salary
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -68,11 +72,15 @@ export const SIDEBAR_MENU = [
       }
     ]
   },
+  // শিক্ষক সেকশন (সঠিকভাবে সাজানো হলো)
   { 
     title: "শিক্ষক সেকশন", 
     icon: Presentation,
     subItems: [
-      // ভবিষ্যতে আইটেম এখানে যুক্ত করবেন
+      { title: "অ্যাকাউন্ট ও তালিকা", path: "/teachers/directory", icon: Contact },
+      { title: "হাজিরা ও রিপোর্ট", path: "/teachers/attendance", icon: ClipboardCheck },
+      { title: "প্রোফাইল ও হিস্ট্রি", path: "/teachers/details", icon: Search },
+      { title: "বেতন ও বোনাস", path: "/teachers/salary", icon: HandCoins }
     ]
   },
   { 
@@ -82,7 +90,6 @@ export const SIDEBAR_MENU = [
        // ভবিষ্যতে আইটেম এখানে যুক্ত করবেন
     ]
   },
-  // নতুন SMS মডিউল যুক্ত করা হলো
   { 
     title: "SMS মডিউল", 
     icon: MessageSquare,

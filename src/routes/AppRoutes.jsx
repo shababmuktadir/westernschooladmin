@@ -16,10 +16,11 @@ import FeeHistory from "@/features/fee/pages/FeeHistory";
 import AddAdmin from "@/features/fee/pages/AddAdmin";
 import AttendanceSmsPage from "@/features/sms/pages/AttendanceSmsPage";
 import CustomSmsPage from "@/features/sms/pages/CustomSmsPage";
-
-// ✅ New import
 import FeeReport from "@/features/fee/pages/FeeReport";
-
+import TeacherDirectory from "@/features/teachers/pages/TeacherDirectory";
+import TeacherAttendance from "@/features/teachers/pages/TeacherAttendance";
+import TeacherDetails from "@/features/teachers/pages/TeacherDetails";
+import TeacherSalary from "@/features/teachers/pages/TeacherSalary";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -38,13 +39,15 @@ export default function AppRoutes() {
           <Route path="/fee/entry" element={<FeeEntry />} />
           <Route path="/fee/bulk-import" element={<BulkFeeImport />} />
           <Route path="/fee/history" element={<FeeHistory />} />
-          
+          <Route path="/teachers/directory" element={<TeacherDirectory />} />
+          <Route path="/teachers/attendance" element={<TeacherAttendance />} />
           {/* ✅ New route */}
           <Route path="/fee/report" element={<FeeReport />} />
           <Route path="/attendance-sms" element={<AttendanceSmsPage />} />
-<Route path="/custom-sms" element={<CustomSmsPage />} />
+          <Route path="/custom-sms" element={<CustomSmsPage />} />
           <Route path="/add-admin" element={<AddAdmin />} />
-          
+          <Route path="/teachers/details" element={<TeacherDetails />} />
+<Route path="/teachers/salary" element={<TeacherSalary />} />
 
         </Route>
       </Route>
