@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { getTeachers, getSalariesByMonth, payTeacherSalary, deleteAllSalariesByMonth } from "../services/teacherService";
-import { sendSMS } from "@/features/sms/services/smsService"; // SMS Service Path
-import { Banknote, Printer, CheckCircle, ToggleLeft, ToggleRight, FileSearch, Trash2, CalendarDays } from "lucide-react";
+import { sendSMS } from "@/features/sms/services/smsService"; 
+import { Banknote, Printer, CheckCircle, ToggleLeft, ToggleRight, FileSearch, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import SalarySheetTemplate from "@/templates/pdf/SalarySheetTemplate";
 import ConfirmModal from "@/components/ui/ConfirmModal"; 
+import DatePicker from "@/components/ui/DatePicker"; // <--- আপনার তৈরি করা DatePicker ইমপোর্ট করা হলো
 
 export default function TeacherSalary() {
   const [teachers, setTeachers] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [paidRecords, setPaidRecords] = useState([]);
   
   // Inputs State
@@ -28,12 +29,18 @@ export default function TeacherSalary() {
   const fetchData = async () => {
     const tData = await getTeachers();
     setTeachers(tData.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId)));
-    const sData = await getSalariesByMonth(selectedMonth);
-    setPaidRecords(sData);
+    
+    if (selectedMonth) {
+      const sData = await getSalariesByMonth(selectedMonth);
+      setPaidRecords(sData);
+    } else {
+      setPaidRecords([]);
+    }
   };
 
-  // Pay Salary & Auto Send SMS
   const handlePay = async (teacher) => {
+    if (!selectedMonth) return toast.error("Please select a date/month first!");
+
     const customBase = baseInputs[teacher.teacherId];
     const finalBase = customBase !== undefined ? Number(customBase) : Number(teacher.salary || 0);
     const bonus = showBonusColumn ? Number(bonusInputs[teacher.teacherId] || 0) : 0;
@@ -51,11 +58,9 @@ export default function TeacherSalary() {
     };
 
     try {
-      // 1. Save Salary to Database
       await payTeacherSalary(salaryData);
       toast.success(`${teacher.englishName}'s salary saved!`);
 
-      // 2. Auto Send SMS (Without Confirmation)
       if (teacher.phone) {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-GB');
@@ -69,13 +74,9 @@ export default function TeacherSalary() {
           toast.success(`SMS successfully sent to ${teacher.phone}`);
         } else {
           toast.error(`SMS Failed: ${smsRes.error || "Unknown Error"}`);
-          console.error("SMS API Error:", smsRes);
         }
-      } else {
-        toast.error("No phone number found for SMS.");
       }
 
-      // Clear Inputs and Refresh Table
       setBonusInputs({ ...bonusInputs, [teacher.teacherId]: "" });
       fetchData();
     } catch (error) {
@@ -83,8 +84,8 @@ export default function TeacherSalary() {
     }
   };
 
-  // Delete All Records
   const confirmDeleteAll = async () => {
+    if (!selectedMonth) return;
     try {
       await deleteAllSalariesByMonth(selectedMonth);
       toast.success(`All salary records for ${selectedMonth} have been deleted!`);
@@ -106,8 +107,6 @@ export default function TeacherSalary() {
   return (
     <>
       <div className="max-w-7xl mx-auto p-6 animate-in fade-in">
-        
-        {/* Header Area */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -122,24 +121,19 @@ export default function TeacherSalary() {
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center bg-white dark:bg-[#1a2235] p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex flex-wrap gap-3 items-center bg-white dark:bg-[#1a2235] p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative z-20">
             
-            {/* Custom Styled Month Picker matching your Dark Theme image */}
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <CalendarDays className="h-4 w-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
-              </div>
-              <input 
-                type="month" 
+            {/* আপনার কাস্টম DatePicker কম্পোনেন্ট ব্যবহার করা হলো */}
+            <div className="w-full md:w-56">
+              <DatePicker 
                 value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="pl-10 p-2.5 w-full md:w-48 border border-slate-300 dark:border-blue-500/50 rounded-xl bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white dark:[color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium transition-all hover:border-blue-500 cursor-pointer shadow-sm"
+                onChange={(val) => setSelectedMonth(val)} 
               />
             </div>
             
             <button 
               onClick={() => setIsDeleteAllModalOpen(true)}
-              disabled={paidRecords.length === 0}
+              disabled={paidRecords.length === 0 || !selectedMonth}
               className="bg-red-50 hover:bg-red-100 dark:bg-[#1e293b] dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all border border-red-200 dark:border-red-900/50 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm"
               title="Delete all salaries for this month"
             >
@@ -148,12 +142,13 @@ export default function TeacherSalary() {
 
             <button 
               onClick={() => setShowPreview(!showPreview)}
-              className="bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b] dark:hover:bg-blue-900/30 text-slate-700 dark:text-blue-400 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all border border-transparent dark:border-blue-500/30 hover:shadow-sm"
+              disabled={!selectedMonth}
+              className="bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b] dark:hover:bg-blue-900/30 text-slate-700 dark:text-blue-400 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all border border-transparent dark:border-blue-500/30 hover:shadow-sm disabled:opacity-50"
             >
               <FileSearch className="w-4 h-4"/> Preview
             </button>
 
-            {paidRecords.length > 0 ? (
+            {paidRecords.length > 0 && selectedMonth ? (
               <PDFDownloadLink
                 document={<SalarySheetTemplate records={paidRecords} month={selectedMonth} totals={totals} showBonus={showBonusColumn} />}
                 fileName={`Salary_Report_${selectedMonth}.pdf`}
@@ -170,8 +165,8 @@ export default function TeacherSalary() {
         </div>
 
         {/* --- LIVE PREVIEW SECTION --- */}
-        {showPreview && paidRecords.length > 0 && (
-          <div className="mb-8 p-8 bg-white rounded-2xl shadow-lg border border-slate-200 animate-in slide-in-from-top-4 overflow-x-auto">
+        {showPreview && paidRecords.length > 0 && selectedMonth && (
+          <div className="mb-8 p-8 bg-white rounded-2xl shadow-lg border border-slate-200 animate-in slide-in-from-top-4 overflow-x-auto relative z-10">
             <div className="text-center mb-6 pb-6 border-b-2 border-slate-800">
               <img src="/logo.png" alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain" />
               <h2 className="text-2xl font-black text-slate-900 uppercase tracking-wider font-serif">Western School and College</h2>
@@ -208,7 +203,7 @@ export default function TeacherSalary() {
         )}
 
         {/* --- MAIN ACTION TABLE --- */}
-        <div className="bg-white dark:bg-[#1a2235] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-8">
+        <div className="bg-white dark:bg-[#1a2235] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-8 relative z-10">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[700px]">
               <thead className="bg-slate-50 dark:bg-[#151c2c] text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
@@ -231,7 +226,6 @@ export default function TeacherSalary() {
                         <p className="text-xs text-slate-500 mt-0.5">ID: {t.teacherId}</p>
                       </td>
                       
-                      {/* Editable Base Salary */}
                       <td className="p-4 text-right">
                         {alreadyPaid ? (
                           <span className="font-bold text-slate-700 dark:text-slate-300">৳ {Number(paidData.baseSalary).toLocaleString()}</span>
@@ -239,14 +233,14 @@ export default function TeacherSalary() {
                           <input 
                             type="number" 
                             placeholder="Base" 
+                            disabled={!selectedMonth}
                             value={baseInputs[t.teacherId] !== undefined ? baseInputs[t.teacherId] : (t.salary || "")}
                             onChange={(e) => setBaseInputs({...baseInputs, [t.teacherId]: e.target.value})}
-                            className="p-2.5 border border-slate-300 dark:border-slate-700 rounded-xl w-32 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all hover:border-blue-400 dark:hover:border-blue-500"
+                            className="p-2.5 border border-slate-300 dark:border-slate-700 rounded-xl w-32 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all hover:border-blue-400 dark:hover:border-blue-500 disabled:opacity-50"
                           />
                         )}
                       </td>
                       
-                      {/* Editable Bonus Column */}
                       {showBonusColumn && (
                         <td className="p-4 text-right">
                           {alreadyPaid ? (
@@ -255,9 +249,10 @@ export default function TeacherSalary() {
                             <input 
                               type="number" 
                               placeholder="Optional" 
+                              disabled={!selectedMonth}
                               value={bonusInputs[t.teacherId] || ""}
                               onChange={(e) => setBonusInputs({...bonusInputs, [t.teacherId]: e.target.value})}
-                              className="p-2.5 border border-slate-300 dark:border-slate-700 rounded-xl w-28 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all hover:border-blue-400 dark:hover:border-blue-500"
+                              className="p-2.5 border border-slate-300 dark:border-slate-700 rounded-xl w-28 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all hover:border-blue-400 dark:hover:border-blue-500 disabled:opacity-50"
                             />
                           )}
                         </td>
@@ -271,7 +266,8 @@ export default function TeacherSalary() {
                         ) : (
                           <button 
                             onClick={() => handlePay(t)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-2 mx-auto"
+                            disabled={!selectedMonth}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 dark:disabled:bg-slate-700 text-white px-8 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-2 mx-auto"
                           >
                             PAY NOW
                           </button>
@@ -293,7 +289,6 @@ export default function TeacherSalary() {
         </div>
       </div>
 
-      {/* Render the Custom Bottom Glassmorphism Confirm Modal for Delete All */}
       <ConfirmModal 
         isOpen={isDeleteAllModalOpen}
         onClose={() => setIsDeleteAllModalOpen(false)}
