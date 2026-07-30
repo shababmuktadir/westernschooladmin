@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { getTeachers, getSalariesByMonth, payTeacherSalary, deleteAllSalariesByMonth } from "../services/teacherService";
+// SMS সার্ভিসটি আপনার প্রজেক্টের সঠিক পাথ অনুযায়ী ইমপোর্ট করে নিন (উদাহরণস্বরূপ নিচে দেওয়া হলো)
+import { sendSMS } from "@/features/sms/services/smsService";
 import { Banknote, Printer, CheckCircle, ToggleLeft, ToggleRight, FileSearch, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import SalarySheetTemplate from "@/templates/pdf/SalarySheetTemplate";
-import ConfirmModal from "@/components/ui/ConfirmModal"; // <--- Import Glassmorphism Modal
+import ConfirmModal from "@/components/ui/ConfirmModal"; 
 
 export default function TeacherSalary() {
   const [teachers, setTeachers] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
   const [paidRecords, setPaidRecords] = useState([]);
-  const [bonusInputs, setBonusInputs] = useState({});
+  
+  // Inputs State
+  const [baseInputs, setBaseInputs] = useState({}); // Custom Base Salary 
+  const [bonusInputs, setBonusInputs] = useState({}); // Custom Bonus
+  
   const [showBonusColumn, setShowBonusColumn] = useState(false); 
   const [showPreview, setShowPreview] = useState(false); 
-  
-  // Delete All Modal State
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
 
   useEffect(() => {
@@ -29,24 +33,51 @@ export default function TeacherSalary() {
   };
 
   const handlePay = async (teacher) => {
+    // Check if custom base salary is entered, otherwise fallback to default profile salary
+    const customBase = baseInputs[teacher.teacherId];
+    const finalBase = customBase !== undefined ? Number(customBase) : Number(teacher.salary || 0);
     const bonus = showBonusColumn ? Number(bonusInputs[teacher.teacherId] || 0) : 0;
-    const base = Number(teacher.salary || 0);
-    const total = base + bonus;
+    const total = finalBase + bonus;
 
-    if (base === 0) return toast.error("Base salary is not set for this teacher!");
+    if (finalBase === 0) return toast.error("Base salary cannot be 0!");
 
     const salaryData = {
       teacherId: teacher.teacherId,
       name: teacher.englishName,
       month: selectedMonth,
-      baseSalary: base,
+      baseSalary: finalBase,
       bonus: bonus,
       totalAmount: total
     };
 
     try {
+      // 1. Save Salary to Database
       await payTeacherSalary(salaryData);
-      toast.success(`${teacher.englishName} paid!`);
+      toast.success(`${teacher.englishName}'s salary saved!`);
+
+      // 2. Auto Send SMS (If Phone Number Exists)
+      if (teacher.phone) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB');
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const monthName = new Date(selectedMonth + "-01").toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        
+        const smsMsg = `Dear ${teacher.englishName}, your salary for ${monthName} has been paid. Amount: ${total} Tk. Date: ${dateStr}, Time: ${timeStr}. - Western School`;
+        
+        const smsRes = await sendSMS(teacher.phone, smsMsg);
+        
+        // Error checking update
+        if (smsRes.success) {
+          toast.success(`SMS sent to ${teacher.phone}`);
+        } else {
+          // এটি আপনাকে আসল এরর দেখাবে
+          toast.error(`SMS Failed: ${smsRes.error || "Unknown Error"}`);
+          console.error("SMS API Full Error:", smsRes);
+        }
+      } else {
+        toast.error("No phone number found for SMS.");
+      }
+      // Clear Inputs and Refresh
       setBonusInputs({ ...bonusInputs, [teacher.teacherId]: "" });
       fetchData();
     } catch (error) {
@@ -54,13 +85,12 @@ export default function TeacherSalary() {
     }
   };
 
-  // Delete All Function
   const confirmDeleteAll = async () => {
     try {
       await deleteAllSalariesByMonth(selectedMonth);
       toast.success(`All salary records for ${selectedMonth} have been deleted!`);
       setIsDeleteAllModalOpen(false);
-      fetchData(); // Refresh Data
+      fetchData(); 
     } catch (error) {
       toast.error("Failed to delete records.");
     }
@@ -181,40 +211,60 @@ export default function TeacherSalary() {
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-[#151c2c] text-slate-600 dark:text-slate-300">
               <tr>
-                <th className="p-4">Teacher Name & ID</th>
-                <th className="p-4 text-right">Base Salary</th>
-                {showBonusColumn && <th className="p-4 text-right">Add Bonus</th>}
+                <th className="p-4">Teacher Info</th>
+                <th className="p-4 text-right">Base Salary ৳</th>
+                {showBonusColumn && <th className="p-4 text-right">Bonus ৳</th>}
                 <th className="p-4 text-center">Action / Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {teachers.map(t => {
                 const alreadyPaid = isPaid(t.teacherId);
+                const paidData = alreadyPaid ? paidRecords.find(r => r.teacherId === t.teacherId) : null;
+
                 return (
                   <tr key={t.id} className={alreadyPaid ? "bg-slate-50/50 dark:bg-emerald-900/10" : "hover:bg-slate-50 dark:hover:bg-[#1e293b]/50 transition-colors"}>
                     <td className="p-4">
                       <p className="font-bold text-slate-900 dark:text-white">{t.englishName}</p>
                       <p className="text-xs text-slate-500">ID: {t.teacherId}</p>
                     </td>
-                    <td className="p-4 text-right font-bold text-slate-700 dark:text-slate-300">৳ {Number(t.salary || 0).toLocaleString()}</td>
                     
-                    {showBonusColumn && (
-                      <td className="p-4 text-right">
+                    {/* Editable Base Salary (Shows static if already paid) */}
+                    <td className="p-4 text-right">
+                      {alreadyPaid ? (
+                        <span className="font-bold text-slate-700 dark:text-slate-300">৳ {Number(paidData.baseSalary).toLocaleString()}</span>
+                      ) : (
                         <input 
                           type="number" 
-                          placeholder="Bonus ৳" 
-                          disabled={alreadyPaid}
-                          value={bonusInputs[t.teacherId] || ""}
-                          onChange={(e) => setBonusInputs({...bonusInputs, [t.teacherId]: e.target.value})}
-                          className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg w-32 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white disabled:opacity-50 focus:ring-2 focus:ring-blue-500/50 outline-none"
+                          placeholder="Base Salary" 
+                          value={baseInputs[t.teacherId] !== undefined ? baseInputs[t.teacherId] : (t.salary || "")}
+                          onChange={(e) => setBaseInputs({...baseInputs, [t.teacherId]: e.target.value})}
+                          className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg w-28 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
                         />
+                      )}
+                    </td>
+                    
+                    {/* Editable Bonus Column */}
+                    {showBonusColumn && (
+                      <td className="p-4 text-right">
+                        {alreadyPaid ? (
+                          <span className="font-bold text-orange-500">৳ {Number(paidData.bonus).toLocaleString()}</span>
+                        ) : (
+                          <input 
+                            type="number" 
+                            placeholder="Optional" 
+                            value={bonusInputs[t.teacherId] || ""}
+                            onChange={(e) => setBonusInputs({...bonusInputs, [t.teacherId]: e.target.value})}
+                            className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg w-24 text-right bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+                          />
+                        )}
                       </td>
                     )}
                     
                     <td className="p-4 text-center">
                       {alreadyPaid ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2 rounded-lg font-bold text-xs border border-emerald-200 dark:border-emerald-800">
-                          <CheckCircle className="w-4 h-4" /> PAID
+                          <CheckCircle className="w-4 h-4" /> PAID (৳ {paidData.totalAmount})
                         </span>
                       ) : (
                         <button 
@@ -233,7 +283,6 @@ export default function TeacherSalary() {
         </div>
       </div>
 
-      {/* Render the Custom Bottom Glassmorphism Confirm Modal for Delete All */}
       <ConfirmModal 
         isOpen={isDeleteAllModalOpen}
         onClose={() => setIsDeleteAllModalOpen(false)}
