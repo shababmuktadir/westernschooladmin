@@ -19,9 +19,10 @@ import {
   CalendarCheck, 
   Send,
   Contact,           // for Teacher Directory
-  ClipboardCheck,    // for Teacher Attendance (Added comma here)
+  ClipboardCheck,    // for Teacher Attendance
   Search,            // for Teacher Details
-  HandCoins          // for Teacher Salary
+  HandCoins,         // for Teacher Salary
+  LayoutTemplate     // <-- New import for Blank Marksheet
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -57,7 +58,8 @@ export const SIDEBAR_MENU = [
         subItems: [
           { title: "ফলাফল এন্ট্রি", path: "/result/entry", icon: FileEdit },
           { title: "ফলাফল হিস্ট্রি", path: "/result/history", icon: History },
-          { title: "ওভারঅল রিপোর্ট", path: "/result/overall-report", icon: LineChart }
+          { title: "ওভারঅল রিপোর্ট", path: "/result/overall-report", icon: LineChart },
+          { title: "ব্ল্যাঙ্ক মার্কশিট", path: "/result/blank-marksheet", icon: LayoutTemplate } // <-- Added here
         ]
       },
       { 
@@ -72,7 +74,6 @@ export const SIDEBAR_MENU = [
       }
     ]
   },
-  // শিক্ষক সেকশন (সঠিকভাবে সাজানো হলো)
   { 
     title: "শিক্ষক সেকশন", 
     icon: Presentation,
