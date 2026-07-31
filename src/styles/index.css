@@ -46,3 +46,16 @@ input::placeholder, textarea::placeholder {
     @apply tracking-wide;
   }
 }
+@font-face {
+  font-family: 'kalpurush';
+  src: url('/kalpurush.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'SutonnyMJ';
+  src: url('/SutonnyMJ-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Anton';
+  src: url('/Anton-Regular.ttf') format('truetype');
+}
+/* এভাবে প্রয়োজনীয় ফন্টগুলো অ্যাড করে নিবেন */
