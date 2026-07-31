@@ -22,7 +22,8 @@ import {
   ClipboardCheck,    // for Teacher Attendance
   Search,            // for Teacher Details
   HandCoins,         // for Teacher Salary
-  LayoutTemplate     // <-- New import for Blank Marksheet
+  LayoutTemplate,    // for Blank Marksheet
+  BookOpen           // <-- New import for Notebook
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -59,7 +60,7 @@ export const SIDEBAR_MENU = [
           { title: "ফলাফল এন্ট্রি", path: "/result/entry", icon: FileEdit },
           { title: "ফলাফল হিস্ট্রি", path: "/result/history", icon: History },
           { title: "ওভারঅল রিপোর্ট", path: "/result/overall-report", icon: LineChart },
-          { title: "ব্ল্যাঙ্ক মার্কশিট", path: "/result/blank-marksheet", icon: LayoutTemplate } // <-- Added here
+          { title: "ব্ল্যাঙ্ক মার্কশিট", path: "/result/blank-marksheet", icon: LayoutTemplate } 
         ]
       },
       { 
@@ -88,7 +89,7 @@ export const SIDEBAR_MENU = [
     title: "অফিস সেকশন", 
     icon: Building2,
     subItems: [
-       // ভবিষ্যতে আইটেম এখানে যুক্ত করবেন
+      { title: "নোটবুক", path: "/notebook", icon: BookOpen } // <-- Added Notebook here
     ]
   },
   { 
