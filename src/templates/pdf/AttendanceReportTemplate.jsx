@@ -1,18 +1,19 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 
+// ariblk.ttf (Arial Black) ফন্ট রেজিস্টার করা হলো এবং origin অ্যাড করা হলো
 Font.register({
-  family: 'Anton',
-  src: '/Anton-Regular.ttf',
+  family: 'ArialBlack',
+  src: `${window.location.origin}/ariblk.ttf`,
 });
 
-// Using standard Helvetica for general text, and Anton for headers
 const styles = StyleSheet.create({
   page: { padding: 40, backgroundColor: '#ffffff' },
   header: { textAlign: 'center', marginBottom: 25, borderBottomWidth: 2, borderBottomColor: '#1e293b', paddingBottom: 15 },
   logoBox: { width: 60, height: 60, alignSelf: 'center', marginBottom: 10 },
   logo: { width: '100%', height: '100%', objectFit: 'contain' },
-  schoolName: { fontFamily: 'Anton', fontSize: 28, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1 },
+  // Anton এর বদলে ArialBlack ব্যবহার করা হলো
+  schoolName: { fontFamily: 'ArialBlack', fontSize: 24, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1 },
   reportTitle: { fontSize: 16, color: '#334155', marginTop: 5, fontWeight: 'bold' },
   reportDate: { fontSize: 12, color: '#64748b', marginTop: 3 },
   statsContainer: { flexDirection: 'row', justifyContent: 'flex-start', gap: 40, marginBottom: 20 },
@@ -29,8 +30,8 @@ const styles = StyleSheet.create({
   headerText: { fontWeight: 'bold', color: '#0f172a', fontSize: 10 },
   footer: { position: 'absolute', bottom: 40, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTop: '1pt solid #cbd5e1' },
   signText: { fontSize: 10, color: '#0f172a', fontWeight: 'bold' },
-  present: { color: '#059669' }, // Emerald
-  absent: { color: '#dc2626' } // Red
+  present: { color: '#059669' }, 
+  absent: { color: '#dc2626' } 
 });
 
 export default function AttendanceReportTemplate({ records, date }) {
@@ -43,7 +44,8 @@ export default function AttendanceReportTemplate({ records, date }) {
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.logoBox}>
-            <Image src="/logo.png" style={styles.logo} />
+            {/* লোগো লিংক ফিক্স করা হলো */}
+            <Image src={`${window.location.origin}/logo.png`} style={styles.logo} />
           </View>
           <Text style={styles.schoolName}>Western School and College</Text>
           <Text style={styles.reportTitle}>TEACHERS ATTENDANCE REPORT</Text>
@@ -66,7 +68,7 @@ export default function AttendanceReportTemplate({ records, date }) {
           </View>
 
           {records.map((r, i) => (
-            <View key={i} style={styles.tableRow}>
+            <View key={i} style={styles.tableRow} wrap={false}>
               <Text style={[styles.tableCell, styles.col1]}>{r.teacherId}</Text>
               <Text style={[styles.tableCell, styles.col2]}>{r.name}</Text>
               <Text style={[styles.tableCell, styles.col3]}>{new Date(r.date).toLocaleDateString('en-US')}</Text>
@@ -78,7 +80,7 @@ export default function AttendanceReportTemplate({ records, date }) {
           ))}
         </View>
 
-        <View style={styles.footer}>
+        <View style={styles.footer} fixed>
           <Text style={styles.signText}>Prepared By</Text>
           <Text style={styles.signText}>Principal Signature</Text>
         </View>

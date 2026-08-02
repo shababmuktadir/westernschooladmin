@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import SalarySheetTemplate from "@/templates/pdf/SalarySheetTemplate";
 import ConfirmModal from "@/components/ui/ConfirmModal"; 
-import DatePicker from "@/components/ui/DatePicker"; // <--- আপনার তৈরি করা DatePicker ইমপোর্ট করা হলো
 
 export default function TeacherSalary() {
   const [teachers, setTeachers] = useState([]);
@@ -16,6 +15,7 @@ export default function TeacherSalary() {
   // Inputs State
   const [baseInputs, setBaseInputs] = useState({});
   const [bonusInputs, setBonusInputs] = useState({});
+  const [customMonths, setCustomMonths] = useState({}); // <--- Individual Teacher Month State
   
   // Toggles & Modals
   const [showBonusColumn, setShowBonusColumn] = useState(false); 
@@ -39,7 +39,9 @@ export default function TeacherSalary() {
   };
 
   const handlePay = async (teacher) => {
-    if (!selectedMonth) return toast.error("Please select a date/month first!");
+    // Determine the month to pay for (row-specific month or global month fallback)
+    const payMonth = customMonths[teacher.teacherId] || selectedMonth;
+    if (!payMonth) return toast.error("Please select a valid month for this teacher!");
 
     const customBase = baseInputs[teacher.teacherId];
     const finalBase = customBase !== undefined ? Number(customBase) : Number(teacher.salary || 0);
@@ -51,7 +53,7 @@ export default function TeacherSalary() {
     const salaryData = {
       teacherId: teacher.teacherId,
       name: teacher.englishName,
-      month: selectedMonth,
+      month: payMonth, // <--- Using the specific payMonth
       baseSalary: finalBase,
       bonus: bonus,
       totalAmount: total
@@ -59,13 +61,13 @@ export default function TeacherSalary() {
 
     try {
       await payTeacherSalary(salaryData);
-      toast.success(`${teacher.englishName}'s salary saved!`);
+      toast.success(`${teacher.englishName}'s salary for ${payMonth} saved!`);
 
       if (teacher.phone) {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-GB');
         const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        const monthName = new Date(selectedMonth + "-01").toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const monthName = new Date(payMonth + "-01").toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
         const smsMsg = `Dear ${teacher.englishName}, your salary for ${monthName} has been paid. Amount: ${total} Tk. Date: ${dateStr}, Time: ${timeStr}. - Western School`;
         
@@ -78,7 +80,7 @@ export default function TeacherSalary() {
       }
 
       setBonusInputs({ ...bonusInputs, [teacher.teacherId]: "" });
-      fetchData();
+      fetchData(); // Refresh data to show changes
     } catch (error) {
       toast.error("Failed to process payment.");
     }
@@ -123,11 +125,16 @@ export default function TeacherSalary() {
 
           <div className="flex flex-wrap gap-3 items-center bg-white dark:bg-[#1a2235] p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative z-20">
             
-            {/* আপনার কাস্টম DatePicker কম্পোনেন্ট ব্যবহার করা হলো */}
-            <div className="w-full md:w-56">
-              <DatePicker 
-                value={selectedMonth} 
-                onChange={(val) => setSelectedMonth(val)} 
+            {/* Native Input Month Picker */}
+            <div className="w-full md:w-48">
+              <input 
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value);
+                  setCustomMonths({}); // Reset individual month overrides when global month changes
+                }}
+                className="w-full p-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-[#151c2c] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-bold"
               />
             </div>
             
@@ -205,10 +212,11 @@ export default function TeacherSalary() {
         {/* --- MAIN ACTION TABLE --- */}
         <div className="bg-white dark:bg-[#1a2235] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-8 relative z-10">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left min-w-[700px]">
+            <table className="w-full text-sm text-left min-w-[800px]">
               <thead className="bg-slate-50 dark:bg-[#151c2c] text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="p-4 font-semibold">Teacher Info</th>
+                  <th className="p-4 font-semibold text-center">Pay Month</th>
                   <th className="p-4 text-right font-semibold">Base Salary ৳</th>
                   {showBonusColumn && <th className="p-4 text-right font-semibold">Bonus ৳</th>}
                   <th className="p-4 text-center font-semibold">Action / Status</th>
@@ -221,11 +229,30 @@ export default function TeacherSalary() {
 
                   return (
                     <tr key={t.id} className={alreadyPaid ? "bg-slate-50/50 dark:bg-emerald-900/10" : "hover:bg-slate-50 dark:hover:bg-[#1e293b]/50 transition-colors"}>
+                      
+                      {/* Teacher Info */}
                       <td className="p-4">
                         <p className="font-bold text-slate-900 dark:text-white">{t.englishName}</p>
                         <p className="text-xs text-slate-500 mt-0.5">ID: {t.teacherId}</p>
                       </td>
+
+                      {/* Pay Month Selector (Custom for each row) */}
+                      <td className="p-4 text-center">
+                        {alreadyPaid ? (
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                            {new Date((paidData.month) + "-01").toLocaleDateString('en-US', {month: 'short', year: 'numeric'})}
+                          </span>
+                        ) : (
+                          <input 
+                            type="month"
+                            value={customMonths[t.teacherId] || selectedMonth}
+                            onChange={(e) => setCustomMonths({...customMonths, [t.teacherId]: e.target.value})}
+                            className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                          />
+                        )}
+                      </td>
                       
+                      {/* Base Salary */}
                       <td className="p-4 text-right">
                         {alreadyPaid ? (
                           <span className="font-bold text-slate-700 dark:text-slate-300">৳ {Number(paidData.baseSalary).toLocaleString()}</span>
@@ -241,6 +268,7 @@ export default function TeacherSalary() {
                         )}
                       </td>
                       
+                      {/* Bonus */}
                       {showBonusColumn && (
                         <td className="p-4 text-right">
                           {alreadyPaid ? (
@@ -258,6 +286,7 @@ export default function TeacherSalary() {
                         </td>
                       )}
                       
+                      {/* Action / Status */}
                       <td className="p-4 text-center">
                         {alreadyPaid ? (
                           <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2.5 rounded-xl font-bold text-xs border border-emerald-200 dark:border-emerald-800 shadow-sm">
@@ -278,7 +307,7 @@ export default function TeacherSalary() {
                 })}
                 {teachers.length === 0 && (
                   <tr>
-                    <td colSpan={showBonusColumn ? 4 : 3} className="p-8 text-center text-slate-500">
+                    <td colSpan={showBonusColumn ? 5 : 4} className="p-8 text-center text-slate-500">
                       No teachers found in the directory.
                     </td>
                   </tr>
