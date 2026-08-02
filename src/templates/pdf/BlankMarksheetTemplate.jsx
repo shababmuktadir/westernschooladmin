@@ -4,7 +4,7 @@ import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/
 // Anton ফন্ট ইমপোর্ট করা হলো
 Font.register({
   family: 'Anton',
-  src: '/Anton-Regular.ttf',
+  src: 'public\ariblk.ttf',
 });
 
 // প্রিন্সিপাল এবং ক্লাস টিচারদের সিগনেচারের লিস্ট
