@@ -1,10 +1,10 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer';
 
-// Anton ফন্ট ইমপোর্ট করা হলো
+// ariblk.ttf (Arial Black) ফন্ট ইমপোর্ট করা হলো (ডাইনামিক অরিজিন সহ যাতে 404 এরর না আসে)
 Font.register({
-  family: 'Anton',
-  src: 'public\ariblk.ttf',
+  family: 'ArialBlack',
+  src: `${window.location.origin}/ariblk.ttf`,
 });
 
 // প্রিন্সিপাল এবং ক্লাস টিচারদের সিগনেচারের লিস্ট
@@ -45,11 +45,11 @@ const styles = StyleSheet.create({
   logo: { width: '100%', height: '100%', objectFit: 'contain' },
   
   schoolName: { 
-    fontSize: 26, 
-    color: '#1e3a8a',
-    fontFamily: 'Anton', 
+    fontSize: 24, 
+    color: '#1e3a8a', // Corporate Blue
+    fontFamily: 'ArialBlack', // নতুন ariblk.ttf ফন্ট অ্যাপ্লাই করা হলো
     textTransform: 'uppercase', 
-    letterSpacing: 1.5 
+    letterSpacing: 1.2 
   },
   
   termBox: {
@@ -167,11 +167,11 @@ export default function BlankMarksheetTemplate({ students, className, subjects, 
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
         
-        {/* === Header Section (No 'fixed' prop, so it only appears on Page 1) === */}
+        {/* === Header Section === */}
         <View>
           <View style={styles.headerContainer}>
             <View style={styles.logoBox}>
-              <Image src="/logo.png" style={styles.logo} />
+              <Image src={`${window.location.origin}/logo.png`} style={styles.logo} />
             </View>
             <Text style={styles.schoolName}>Western School & College</Text>
           </View>

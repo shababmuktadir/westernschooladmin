@@ -22,7 +22,7 @@ import TeacherAttendance from "@/features/teachers/pages/TeacherAttendance";
 import TeacherDetails from "@/features/teachers/pages/TeacherDetails";
 import TeacherSalary from "@/features/teachers/pages/TeacherSalary";
 import BlankMarksheet from "@/features/result/pages/BlankMarksheet";
-import Notebook from "@/features/notebook/pages/Notebook";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -44,7 +44,7 @@ export default function AppRoutes() {
           <Route path="/teachers/directory" element={<TeacherDirectory />} />
           <Route path="/teachers/attendance" element={<TeacherAttendance />} />
           {/* ✅ New route */}
-          <Route path="/notebook" element={<Notebook />} />
+          
           <Route path="/fee/report" element={<FeeReport />} />
           <Route path="/attendance-sms" element={<AttendanceSmsPage />} />
           <Route path="/custom-sms" element={<CustomSmsPage />} />
