@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/config/firebase"; 
 import Dropdown from "@/components/ui/Dropdown";
+import { BellRing } from "lucide-react";
 
 // Helper function to safely match IDs (ignores leading zeros and type differences)
 const isIdMatch = (id1, id2) => {
@@ -29,6 +30,10 @@ export default function AttendanceSmsPage() {
 
   const [parsedTxtData, setParsedTxtData] = useState([]);
   const [fileError, setFileError] = useState("");
+
+  // Customizable Fixed Recipients State
+  const [fixedContact1, setFixedContact1] = useState({ name: "Shabab", phone: "01632426210" });
+  const [fixedContact2, setFixedContact2] = useState({ name: "Fahad", phone: "01674785990" });
 
   useEffect(() => {
     fetchBalance();
@@ -173,11 +178,8 @@ export default function AttendanceSmsPage() {
       }
     }
 
-    // 2. Send Fixed SMS to specific numbers
-    const fixedNumbers = [
-      { phone: "01632426210", name: "Shabab" },
-      { phone: "01674785990", name: "Fahad" }
-    ];
+    // 2. Send Fixed SMS to specific numbers (Customizable from UI)
+    const fixedNumbers = [fixedContact1, fixedContact2].filter(c => c.phone && c.phone.trim() !== "");
     const fixedMsg = `Day: ${currentDayName}, Time: 8:50 am, Message: nba.`;
 
     for (const admin of fixedNumbers) {
@@ -246,6 +248,7 @@ export default function AttendanceSmsPage() {
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
         
+        {/* --- MANUAL ABSENT SMS --- */}
         {activeTab === "absent" && (
           <div className="animate-in fade-in">
             <div className="flex justify-between items-center mb-4">
@@ -286,6 +289,7 @@ export default function AttendanceSmsPage() {
           </div>
         )}
 
+        {/* --- QUICK PRESENT SMS --- */}
         {activeTab === "quick" && (
           <div className="max-w-md mx-auto py-8 animate-in fade-in">
             <h3 className="font-semibold text-lg text-slate-800 dark:text-white mb-6 text-center">Send Instant Present SMS</h3>
@@ -322,8 +326,37 @@ export default function AttendanceSmsPage() {
           </div>
         )}
 
+        {/* --- TXT BULK PRESENT SMS --- */}
         {activeTab === "bulk" && (
           <div className="animate-in fade-in py-4">
+            
+            {/* Custom Fixed Recipients Settings */}
+            <div className="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
+              <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <BellRing className="w-5 h-5 text-blue-500" />
+                Additional Recipients (Fixed Notification)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Recipient 1</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={fixedContact1.name} onChange={e => setFixedContact1({...fixedContact1, name: e.target.value})} placeholder="Name" className="w-1/3 p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-[#0f172a] text-sm text-slate-900 dark:text-white" />
+                    <input type="text" value={fixedContact1.phone} onChange={e => setFixedContact1({...fixedContact1, phone: e.target.value})} placeholder="Phone Number" className="w-2/3 p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-[#0f172a] text-sm text-slate-900 dark:text-white" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Recipient 2</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={fixedContact2.name} onChange={e => setFixedContact2({...fixedContact2, name: e.target.value})} placeholder="Name" className="w-1/3 p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-[#0f172a] text-sm text-slate-900 dark:text-white" />
+                    <input type="text" value={fixedContact2.phone} onChange={e => setFixedContact2({...fixedContact2, phone: e.target.value})} placeholder="Phone Number" className="w-2/3 p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-[#0f172a] text-sm text-slate-900 dark:text-white" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-3 font-mono bg-white dark:bg-[#0f172a] p-2 rounded-md border border-slate-200 dark:border-slate-700">
+                <span className="font-bold text-blue-500">Preview:</span> Day: {currentDayName}, Time: 8:50 am, Message: nba.
+              </p>
+            </div>
+
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 bg-slate-50 dark:bg-slate-800/20 mb-6">
               <p className="text-slate-600 dark:text-slate-400 mb-4 font-medium text-center">
                 Upload your Machine generated TXT file here. <br/>
@@ -345,7 +378,7 @@ export default function AttendanceSmsPage() {
                   <button 
                     onClick={handleSendBulkPresentSMS}
                     disabled={isSending}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium disabled:bg-slate-400 transition-colors"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium disabled:bg-slate-400 transition-colors shadow-sm"
                   >
                     {isSending ? "Processing..." : "Save to DB & Send SMS"}
                   </button>
