@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/config/firebase"; 
 import Dropdown from "@/components/ui/Dropdown";
-import { BellRing, CheckCircle2, MessageSquareEdit } from "lucide-react";
+import { BellRing, CheckCircle2, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 
 // Helper function to safely match IDs (ignores leading zeros and type differences)
@@ -21,6 +21,7 @@ export default function AttendanceSmsPage() {
   const [isSending, setIsSending] = useState(false);
 
   const todayDate = format(new Date(), "dd MMM, yyyy");
+  const currentDayName = format(new Date(), "EEEE"); // Gets current day, e.g., "Tuesday"
 
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -395,7 +396,7 @@ export default function AttendanceSmsPage() {
               {/* Editable SMS Template Section */}
               <div className="bg-indigo-50 dark:bg-indigo-900/10 p-5 rounded-xl border border-indigo-200 dark:border-indigo-800/50 mb-6">
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-                  <MessageSquareEdit className="w-5 h-5 text-indigo-500" />
+                  <Edit className="w-5 h-5 text-indigo-500" />
                   SMS Template Configuration
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Edit the message that will be sent. Available Placeholders: <span className="font-mono bg-white dark:bg-slate-800 px-1 rounded">{`{name}`}</span>, <span className="font-mono bg-white dark:bg-slate-800 px-1 rounded">{`{time}`}</span>, <span className="font-mono bg-white dark:bg-slate-800 px-1 rounded">{`{date}`}</span>, <span className="font-mono bg-white dark:bg-slate-800 px-1 rounded">{`{id}`}</span></p>
