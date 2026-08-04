@@ -9,7 +9,7 @@ import OrderedSalarySheetTemplate from "@/templates/pdf/OrderedSalarySheetTempla
 import ConfirmModal from "@/components/ui/ConfirmModal"; 
 
 // --- Custom Tailwind Month Picker Component ---
-const CustomMonthPicker = ({ value, onChange, label }) => {
+const CustomMonthPicker = ({ value, onChange, label, placement = "bottom" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [year, setYear] = useState(parseInt(value.split('-')[0]));
   const [month, setMonth] = useState(parseInt(value.split('-')[1]));
@@ -21,6 +21,10 @@ const CustomMonthPicker = ({ value, onChange, label }) => {
     onChange(`${selectedYear}-${formattedMonth}`);
     setIsOpen(false);
   };
+
+  const dropdownClass = placement === "top" 
+    ? "absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-[#151c2c] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 p-4 animate-in slide-in-from-bottom-2"
+    : "absolute top-full left-0 mt-2 w-64 bg-white dark:bg-[#151c2c] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 p-4 animate-in slide-in-from-top-2";
 
   return (
     <div className="relative w-full md:w-56">
@@ -38,11 +42,11 @@ const CustomMonthPicker = ({ value, onChange, label }) => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
-          <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-[#151c2c] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 p-4 animate-in zoom-in-95">
+          <div className={dropdownClass}>
             <div className="flex justify-between items-center mb-4">
-              <button onClick={() => setYear(year - 1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300">◀</button>
+              <button onClick={() => setYear(year - 1)} className="p-1 hover:bg-slate-100 dark:bg-[#0f172a] rounded text-slate-600 dark:text-slate-300">◀</button>
               <span className="font-black text-lg text-slate-800 dark:text-white">{year}</span>
-              <button onClick={() => setYear(year + 1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300">▶</button>
+              <button onClick={() => setYear(year + 1)} className="p-1 hover:bg-slate-100 dark:bg-[#0f172a] rounded text-slate-600 dark:text-slate-300">▶</button>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {months.map((m, idx) => (
@@ -75,13 +79,14 @@ export default function TeacherSalary() {
   const [bonusInputs, setBonusInputs] = useState({});
   const [customMonths, setCustomMonths] = useState({}); 
   
-  const [draggedIndex, setDraggedIndex] = useState(null);
-
   const [showBonusColumn, setShowBonusColumn] = useState(false); 
   const [showPreview, setShowPreview] = useState(false); 
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   
-  const [showRearrangeModal, setShowRearrangeModal] = useState(false);
+  // Rearrange Modal States
+  const [rearrangeType, setRearrangeType] = useState(null); 
+  const [orderedList, setOrderedList] = useState([]);
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -89,7 +94,28 @@ export default function TeacherSalary() {
 
   const fetchData = async () => {
     const tData = await getTeachers();
-    setTeachers(tData.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId)));
+    
+    // 1. Load Saved Sequence for Main Table (Full List)
+    const savedOrderStr = localStorage.getItem("teacher_salary_order");
+    if (savedOrderStr) {
+      try {
+        const savedOrder = JSON.parse(savedOrderStr);
+        tData.sort((a, b) => {
+          let posA = savedOrder.indexOf(a.teacherId);
+          let posB = savedOrder.indexOf(b.teacherId);
+          if (posA === -1) posA = 999999; // New teachers go to the bottom
+          if (posB === -1) posB = 999999;
+          if (posA !== posB) return posA - posB;
+          return parseInt(a.teacherId) - parseInt(b.teacherId); // Fallback sort
+        });
+      } catch (e) {
+        tData.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId));
+      }
+    } else {
+      tData.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId));
+    }
+    
+    setTeachers(tData);
     
     if (selectedMonth) {
       const sData = await getSalariesByMonth(selectedMonth);
@@ -99,24 +125,9 @@ export default function TeacherSalary() {
     }
   };
 
-  const handleDragStart = (index) => {
-    setDraggedIndex(index);
-  };
+  const isPaid = (teacherId) => paidRecords.some(r => r.teacherId === teacherId);
 
-  const handleDragOver = (e) => {
-    e.preventDefault(); 
-  };
-
-  const handleDrop = (index) => {
-    if (draggedIndex === null || draggedIndex === index) return;
-    const updatedTeachers = [...teachers];
-    const draggedItem = updatedTeachers[draggedIndex];
-    updatedTeachers.splice(draggedIndex, 1);
-    updatedTeachers.splice(index, 0, draggedItem);
-    setTeachers(updatedTeachers);
-    setDraggedIndex(null);
-  };
-
+  // --- PAYMENT LOGIC ---
   const handlePay = async (teacher) => {
     const payMonth = customMonths[teacher.teacherId] || selectedMonth;
     if (!payMonth) return toast.error("Please select a valid month for this teacher!");
@@ -149,11 +160,7 @@ export default function TeacherSalary() {
           const monthName = new Date(payMonth + "-01").toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
           
           const smsMsg = `Dear ${teacher.englishName}, your salary for ${monthName} has been paid. Amount: ${total} Tk. Date: ${dateStr}, Time: ${timeStr}. - Western School`;
-          
-          const smsRes = await sendSMS(teacher.phone, smsMsg);
-          if (smsRes.success) {
-            toast.success(`SMS sent to ${teacher.phone}`);
-          }
+          await sendSMS(teacher.phone, smsMsg);
         } catch (smsError) {
           console.warn("SMS Failed:", smsError);
         }
@@ -178,7 +185,56 @@ export default function TeacherSalary() {
     }
   };
 
-  const isPaid = (teacherId) => paidRecords.some(r => r.teacherId === teacherId);
+  // --- MODAL & DRAG/DROP LOGIC WITH AUTO-SAVE ---
+  const openRearrangeModal = (type) => {
+    if (type === 'paid') {
+      let paidStaff = teachers.filter(t => isPaid(t.teacherId));
+      // Load specific order for Paid Report if exists
+      const savedPaidOrderStr = localStorage.getItem("teacher_paid_salary_order");
+      if (savedPaidOrderStr) {
+         try {
+           const savedPaidOrder = JSON.parse(savedPaidOrderStr);
+           paidStaff.sort((a,b) => {
+              let posA = savedPaidOrder.indexOf(a.teacherId);
+              let posB = savedPaidOrder.indexOf(b.teacherId);
+              if(posA === -1) posA = 999999;
+              if(posB === -1) posB = 999999;
+              if(posA !== posB) return posA - posB;
+              return parseInt(a.teacherId) - parseInt(b.teacherId);
+           });
+         } catch(e){}
+      }
+      setOrderedList(paidStaff);
+    } else {
+      // Full list is already sorted correctly from fetchData
+      setOrderedList(teachers);
+    }
+    setRearrangeType(type);
+  };
+
+  const handleDragStart = (index) => setDraggedIndex(index);
+  const handleDragOver = (e) => e.preventDefault();
+  const handleDrop = (index) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+    const updatedList = [...orderedList];
+    const draggedItem = updatedList[draggedIndex];
+    updatedList.splice(draggedIndex, 1);
+    updatedList.splice(index, 0, draggedItem);
+    setOrderedList(updatedList);
+    setDraggedIndex(null);
+
+    // AUTO-SAVE SEQUENCE TO LOCAL STORAGE
+    if (rearrangeType === 'full') {
+      const orderIds = updatedList.map(t => t.teacherId);
+      localStorage.setItem("teacher_salary_order", JSON.stringify(orderIds));
+      setTeachers(updatedList); // Update main background table simultaneously
+      toast.success("Sequence auto-saved!", { id: "order_save", duration: 1500 });
+    } else if (rearrangeType === 'paid') {
+      const orderIds = updatedList.map(t => t.teacherId);
+      localStorage.setItem("teacher_paid_salary_order", JSON.stringify(orderIds));
+      toast.success("Paid sequence auto-saved!", { id: "order_save", duration: 1500 });
+    }
+  };
 
   const totals = {
     base: paidRecords.reduce((acc, curr) => acc + Number(curr.baseSalary), 0),
@@ -231,24 +287,24 @@ export default function TeacherSalary() {
               <FileSearch className="w-4 h-4"/> Preview
             </button>
 
+            {/* Rearrange Paid Report Button */}
             {paidRecords.length > 0 && selectedMonth ? (
-              <PDFDownloadLink
-                document={<SalarySheetTemplate records={paidRecords} month={selectedMonth} totals={totals} showBonus={showBonusColumn} />}
-                fileName={`Paid_Salaries_${selectedMonth}.pdf`}
+              <button
+                onClick={() => openRearrangeModal('paid')}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
-                title="Download only PAID records"
               >
-                {({ loading }) => (loading ? "Wait..." : <><Printer className="w-4 h-4"/> Paid Report</>)}
-              </PDFDownloadLink>
+                <Printer className="w-4 h-4"/> Paid Report
+              </button>
             ) : (
               <button disabled className="bg-slate-300 dark:bg-slate-700 text-slate-500 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 cursor-not-allowed border border-transparent">
                 <Printer className="w-4 h-4"/> Paid Report
               </button>
             )}
 
+            {/* Rearrange Full Sheet Button */}
             {teachers.length > 0 && selectedMonth ? (
               <button
-                onClick={() => setShowRearrangeModal(true)}
+                onClick={() => openRearrangeModal('full')}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
               >
                 <FileDown className="w-4 h-4"/> Full Sheet
@@ -312,9 +368,11 @@ export default function TeacherSalary() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                {teachers.map((t) => {
+                {teachers.map((t, index) => {
                   const alreadyPaid = isPaid(t.teacherId);
                   const paidData = alreadyPaid ? paidRecords.find(r => r.teacherId === t.teacherId) : null;
+                  
+                  const isLastFew = teachers.length > 3 && index >= teachers.length - 2;
 
                   return (
                     <tr key={t.teacherId} className={`${alreadyPaid ? "bg-slate-50/50 dark:bg-emerald-900/10" : "hover:bg-slate-50 dark:hover:bg-[#1e293b]/50"} transition-colors`}>
@@ -330,6 +388,7 @@ export default function TeacherSalary() {
                           </span>
                         ) : (
                           <CustomMonthPicker 
+                            placement={isLastFew ? "top" : "bottom"}
                             value={customMonths[t.teacherId] || selectedMonth}
                             onChange={(val) => setCustomMonths({...customMonths, [t.teacherId]: val})}
                           />
@@ -396,39 +455,46 @@ export default function TeacherSalary() {
         message={`Are you absolutely sure you want to delete EVERY salary record for the month of ${selectedMonth}? This action cannot be undone.`}
       />
 
-      {/* --- REARRANGE & DOWNLOAD MODAL --- */}
-      {showRearrangeModal && (
+      {/* --- UNIFIED REARRANGE & DOWNLOAD MODAL --- */}
+      {rearrangeType && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowRearrangeModal(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setRearrangeType(null)}></div>
           <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col relative z-10 animate-in zoom-in-95">
             
-            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-[#151c2c] rounded-t-2xl">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-[#151c2c] rounded-t-2xl z-20">
               <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <GripVertical className="w-5 h-5 text-blue-500"/> Rearrange & Print
+                <GripVertical className="w-5 h-5 text-blue-500"/> 
+                {rearrangeType === 'paid' ? 'Rearrange Paid Report' : 'Rearrange Full Sheet'}
               </h2>
-              <button onClick={() => setShowRearrangeModal(false)} className="text-slate-400 hover:text-red-500"><X className="w-5 h-5"/></button>
+              <button onClick={() => setRearrangeType(null)} className="text-slate-400 hover:text-red-500"><X className="w-5 h-5"/></button>
             </div>
 
+            {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               
-              {/* Month Picker inside Modal */}
-              <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">Select the billing month and drag rows to reorder.</p>
-                <div className="w-full sm:w-56 shrink-0 z-50 relative">
-                  <CustomMonthPicker 
-                    value={selectedMonth} 
-                    onChange={(val) => {
-                      setSelectedMonth(val);
-                      setCustomMonths({});
-                    }} 
-                  />
+              {rearrangeType === 'full' && (
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">Select month and drag rows to reorder.</p>
+                  <div className="w-full sm:w-56 shrink-0 relative">
+                    <CustomMonthPicker 
+                      value={selectedMonth} 
+                      onChange={(val) => {
+                        setSelectedMonth(val);
+                        setCustomMonths({});
+                      }} 
+                      placement="bottom"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 text-center">Drag and drop the rows to set the printing sequence. <br/> <span className="text-emerald-500 font-bold">Progress auto-saves automatically.</span></p>
               
               <div className="space-y-2">
-                {teachers.map((t, index) => (
+                {orderedList.map((t, index) => (
                   <div 
-                    key={`drag-${t.teacherId}`}
+                    key={`modal-drag-${t.teacherId}`}
                     draggable
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={handleDragOver}
@@ -443,23 +509,51 @@ export default function TeacherSalary() {
                       <p className="font-bold text-slate-800 dark:text-white">{t.englishName}</p>
                       <p className="text-xs text-slate-500">ID: {t.teacherId}</p>
                     </div>
-                    <div className="text-right text-sm font-bold text-slate-600 dark:text-slate-400">
-                      ৳ {t.salary || 0}
-                    </div>
                   </div>
                 ))}
+                {orderedList.length === 0 && (
+                  <p className="text-center text-slate-500 py-10">No records found to arrange.</p>
+                )}
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151c2c] rounded-b-2xl flex justify-between items-center z-10 relative">
-              <p className="text-xs font-bold text-slate-500 uppercase">Selected: {teachers.length} Staff</p>
-              <PDFDownloadLink
-                document={<OrderedSalarySheetTemplate teachers={teachers} paidRecords={paidRecords} month={selectedMonth} showBonus={showBonusColumn} />}
-                fileName={`Full_Staff_Salary_Sheet_${selectedMonth}.pdf`}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg"
-              >
-                {({ loading }) => (loading ? "Generating PDF..." : <><Download className="w-5 h-5"/> Download PDF</>)}
-              </PDFDownloadLink>
+            {/* Modal Footer with PDF Buttons */}
+            <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151c2c] rounded-b-2xl flex justify-between items-center z-10">
+              <p className="text-xs font-bold text-slate-500 uppercase">Selected: {orderedList.length} Staff</p>
+              
+              {orderedList.length > 0 && (
+                rearrangeType === 'paid' ? (
+                  <PDFDownloadLink
+                    document={
+                      <SalarySheetTemplate 
+                        records={orderedList.map(t => paidRecords.find(r => r.teacherId === t.teacherId)).filter(Boolean)} 
+                        month={selectedMonth} 
+                        totals={totals} 
+                        showBonus={showBonusColumn} 
+                      />
+                    }
+                    fileName={`Paid_Salaries_${selectedMonth}.pdf`}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg"
+                  >
+                    {({ loading }) => (loading ? "Generating PDF..." : <><Download className="w-5 h-5"/> Download PDF</>)}
+                  </PDFDownloadLink>
+                ) : (
+                  <PDFDownloadLink
+                    document={
+                      <OrderedSalarySheetTemplate 
+                        teachers={orderedList} 
+                        paidRecords={paidRecords} 
+                        month={selectedMonth} 
+                        showBonus={showBonusColumn} 
+                      />
+                    }
+                    fileName={`Full_Staff_Salary_Sheet_${selectedMonth}.pdf`}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg"
+                  >
+                    {({ loading }) => (loading ? "Generating PDF..." : <><Download className="w-5 h-5"/> Download PDF</>)}
+                  </PDFDownloadLink>
+                )
+              )}
             </div>
             
           </div>

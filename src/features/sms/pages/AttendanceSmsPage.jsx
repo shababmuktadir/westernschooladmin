@@ -6,6 +6,12 @@ import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/config/firebase"; 
 import Dropdown from "@/components/ui/Dropdown";
 
+// Helper function to safely match IDs (ignores leading zeros and type differences)
+const isIdMatch = (id1, id2) => {
+  if (!id1 || !id2) return false;
+  return String(id1).replace(/^0+/, '') === String(id2).replace(/^0+/, '');
+};
+
 export default function AttendanceSmsPage() {
   const [activeTab, setActiveTab] = useState("absent");
   const [balance, setBalance] = useState("Loading...");
@@ -14,6 +20,7 @@ export default function AttendanceSmsPage() {
   const [results, setResults] = useState({ total: 0, success: 0, failed: 0 });
 
   const todayDate = format(new Date(), "dd MMM, yyyy");
+  const currentDayName = format(new Date(), "EEEE"); // Gets current day, e.g., "Tuesday"
 
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -63,7 +70,7 @@ export default function AttendanceSmsPage() {
     let successCount = 0, failCount = 0;
 
     for (const id of selectedIds) {
-      const student = students.find(s => s.studentId === id);
+      const student = students.find(s => isIdMatch(s.studentId, id));
       if (student && student.contactNumber) {
         const msg = `Dear Guardian, your child ${student.fullName || ""} (ID: ${student.studentId || ""}) is absent from school today (${todayDate}). Please take necessary steps. - Western School`;
         const res = await sendSMS(student.contactNumber, msg);
@@ -85,7 +92,7 @@ export default function AttendanceSmsPage() {
     
     const student = students.find(s => 
       s.class === quickClass && 
-      (s.studentId === quickId || String(s.rollNumber) === String(quickId))
+      (isIdMatch(s.studentId, quickId) || isIdMatch(s.rollNumber, quickId))
     );
 
     if (!student) return alert("No student found with this Class and ID/Roll!");
@@ -154,8 +161,9 @@ export default function AttendanceSmsPage() {
     setIsSending(true);
     let successCount = 0, failCount = 0;
 
+    // 1. Send SMS to all matched students
     for (const record of parsedTxtData) {
-      const student = students.find(s => s.studentId === record.studentId);
+      const student = students.find(s => isIdMatch(s.studentId, record.studentId));
       if (student && student.contactNumber) {
         const msg = `Dear Guardian, your child ${student.fullName} has entered the school premises at ${record.time} on ${record.date}. - Western School`;
         const res = await sendSMS(student.contactNumber, msg);
@@ -165,6 +173,22 @@ export default function AttendanceSmsPage() {
       }
     }
 
+    // 2. Send Fixed SMS to specific numbers
+    const fixedNumbers = [
+      { phone: "01632426210", name: "Shabab" },
+      { phone: "01674785990", name: "Fahad" }
+    ];
+    const fixedMsg = `Day: ${currentDayName}, Time: 8:50 am, Message: nba.`;
+
+    for (const admin of fixedNumbers) {
+      try {
+        await sendSMS(admin.phone, fixedMsg);
+      } catch (adminErr) {
+        console.warn(`Failed to send fixed SMS to ${admin.name}`, adminErr);
+      }
+    }
+
+    // 3. Save logs to Firestore
     try {
       await setDoc(doc(db, "attendance_logs", "latest_txt_upload"), {
         uploadedAt: new Date().toISOString(),
@@ -179,7 +203,7 @@ export default function AttendanceSmsPage() {
     setIsSending(false);
     setParsedTxtData([]); 
     fetchBalance();
-    alert(`Bulk Present SMS Complete!\nSuccess: ${successCount}\nFailed: ${failCount}\n\nLog saved to Firestore.`);
+    alert(`Bulk Present SMS Complete!\nSuccess: ${successCount}\nFailed: ${failCount}\n\nFixed SMS sent to admins.\nLog saved to Firestore.`);
   };
 
   return (
@@ -339,7 +363,7 @@ export default function AttendanceSmsPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                       {parsedTxtData.map((record, index) => {
-                        const matchedStudent = students.find(s => s.studentId === record.studentId);
+                        const matchedStudent = students.find(s => isIdMatch(s.studentId, record.studentId));
                         return (
                           <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="p-3 text-slate-800 dark:text-slate-200 font-medium">{record.studentId}</td>
