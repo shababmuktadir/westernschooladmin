@@ -9,12 +9,9 @@ import {
   History,
   FilePieChart,
   FileSpreadsheet,
-  FileEdit,
-  LineChart,
   FileText, 
   Map, 
   Presentation,
-  Building2,
   MessageSquare, 
   CalendarCheck, 
   Send,
@@ -22,8 +19,7 @@ import {
   ClipboardCheck,    // for Teacher Attendance
   Search,            // for Teacher Details
   HandCoins,         // for Teacher Salary
-  LayoutTemplate,    // for Blank Marksheet
-  BookOpen           // <-- New import for Notebook
+  LayoutTemplate     // for Blank Marksheet
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -57,9 +53,6 @@ export const SIDEBAR_MENU = [
         title: "ফলাফল মডিউল", 
         icon: FileSpreadsheet,
         subItems: [
-          { title: "ফলাফল এন্ট্রি", path: "/result/entry", icon: FileEdit },
-          { title: "ফলাফল হিস্ট্রি", path: "/result/history", icon: History },
-          { title: "ওভারঅল রিপোর্ট", path: "/result/overall-report", icon: LineChart },
           { title: "ব্ল্যাঙ্ক মার্কশিট", path: "/result/blank-marksheet", icon: LayoutTemplate } 
         ]
       },
@@ -83,13 +76,6 @@ export const SIDEBAR_MENU = [
       { title: "হাজিরা ও রিপোর্ট", path: "/teachers/attendance", icon: ClipboardCheck },
       { title: "প্রোফাইল ও হিস্ট্রি", path: "/teachers/details", icon: Search },
       { title: "বেতন ও বোনাস", path: "/teachers/salary", icon: HandCoins }
-    ]
-  },
-  { 
-    title: "অফিস সেকশন", 
-    icon: Building2,
-    subItems: [
-      { title: "নোটবুক", path: "/notebook", icon: BookOpen } // <-- Added Notebook here
     ]
   },
   { 
