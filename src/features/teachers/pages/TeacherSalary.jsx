@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getTeachers, getSalariesByMonth, payTeacherSalary, deleteAllSalariesByMonth } from "../services/teacherService";
 import { sendSMS } from "@/features/sms/services/smsService"; 
-import { Banknote, Printer, CheckCircle, ToggleLeft, ToggleRight, FileSearch, Trash2, GripVertical, FileDown, CalendarDays, X, Users, Download } from "lucide-react";
+import { Banknote, Printer, CheckCircle, ToggleLeft, ToggleRight, FileSearch, Trash2, GripVertical, FileDown, CalendarDays, X, Users, Download, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import SalarySheetTemplate from "@/templates/pdf/SalarySheetTemplate";
@@ -80,6 +80,7 @@ export default function TeacherSalary() {
   const [customMonths, setCustomMonths] = useState({}); 
   
   const [showBonusColumn, setShowBonusColumn] = useState(false); 
+  const [enableSMS, setEnableSMS] = useState(false); // --- SMS Enable State ---
   const [showPreview, setShowPreview] = useState(false); 
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   
@@ -152,7 +153,8 @@ export default function TeacherSalary() {
       await payTeacherSalary(salaryData);
       toast.success(`${teacher.englishName}'s salary for ${payMonth} saved!`);
 
-      if (teacher.phone) {
+      // SMS Logic controlled by enableSMS state
+      if (enableSMS && teacher.phone) {
         try {
           const now = new Date();
           const dateStr = now.toLocaleDateString('en-GB');
@@ -161,8 +163,10 @@ export default function TeacherSalary() {
           
           const smsMsg = `Dear ${teacher.englishName}, your salary for ${monthName} has been paid. Amount: ${total} Tk. Date: ${dateStr}, Time: ${timeStr}. - Western School`;
           await sendSMS(teacher.phone, smsMsg);
+          toast.success(`SMS sent to ${teacher.phone}`);
         } catch (smsError) {
           console.warn("SMS Failed:", smsError);
+          toast.error("Entry saved, but SMS failed.");
         }
       }
 
@@ -245,19 +249,30 @@ export default function TeacherSalary() {
   return (
     <>
       <div className="max-w-7xl mx-auto p-6 animate-in fade-in">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2 uppercase">
               <Users className="w-7 h-7 text-emerald-600" /> Teachers and Staff
             </h1>
             <p className="text-sm text-slate-500 mt-1">Manage monthly salaries and generate reports.</p>
-            <button 
-              onClick={() => setShowBonusColumn(!showBonusColumn)}
-              className="flex items-center gap-2 mt-3 text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-lg transition-colors border border-blue-200 dark:border-blue-800/50"
-            >
-              {showBonusColumn ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
-              {showBonusColumn ? "Bonus Column Enabled" : "Enable Bonus Column"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3 mt-3">
+              <button 
+                onClick={() => setShowBonusColumn(!showBonusColumn)}
+                className="flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-lg transition-colors border border-blue-200 dark:border-blue-800/50"
+              >
+                {showBonusColumn ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                {showBonusColumn ? "Bonus Column Enabled" : "Enable Bonus Column"}
+              </button>
+
+              <button 
+                onClick={() => setEnableSMS(!enableSMS)}
+                className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-lg transition-colors border ${enableSMS ? 'text-emerald-700 bg-emerald-100 border-emerald-300 dark:text-emerald-400 dark:bg-emerald-900/40 dark:border-emerald-700/50' : 'text-slate-600 bg-slate-100 border-slate-300 dark:text-slate-400 dark:bg-slate-800 dark:border-slate-700'}`}
+              >
+                {enableSMS ? <ToggleRight className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                <MessageSquare className="w-4 h-4" />
+                {enableSMS ? "SMS Active" : "Enable SMS"}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center bg-white dark:bg-[#1a2235] p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative z-20">
