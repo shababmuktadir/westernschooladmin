@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom"; // নতুন ইমপোর্ট
+import { useNavigate } from "react-router-dom"; 
 import { getStudents } from "@/features/students/services/studentService";
 import { generateNextInvoiceNo, getStudentPaidMonths, saveStudentFee } from "@/features/fee/services/feeService";
 import InvoiceTemplate from "@/templates/pdf/InvoiceTemplate";
@@ -12,11 +12,10 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
-import Checkbox from "@/components/ui/Checkbox";
 import Badge from "@/components/ui/Badge";
-import DatePicker from "@/components/ui/DatePicker";
+import DatePicker from "@/components/ui/DatePicker"; // Custom DatePicker
 
-import { Search, User, FileText, CheckCircle2, Calculator, Receipt, CreditCard, UploadCloud } from "lucide-react"; // UploadCloud আইকন যোগ করা হয়েছে
+import { Search, User, FileText, CheckCircle2, Calculator, Receipt, CreditCard, UploadCloud } from "lucide-react";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June", 
@@ -37,7 +36,7 @@ const PAYMENT_OPTIONS = [
 ];
 
 export default function FeeEntry() {
-  const navigate = useNavigate(); // নেভিগেশনের জন্য
+  const navigate = useNavigate(); 
   
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -112,8 +111,7 @@ export default function FeeEntry() {
         setMonthFees(prevFees => ({
           ...prevFees,
           [month]: {
-            checked: { "Tuition fee": true },
-            amounts: { "Tuition fee": "" }
+            amounts: {} // Checkbox removed, just keeping empty object for amounts
           }
         }));
         return [...prev, month];
@@ -121,26 +119,14 @@ export default function FeeEntry() {
     });
   };
 
-  const handleMonthFeeCheck = (month, feeType, isChecked) => {
-    setMonthFees(prev => ({
-      ...prev,
-      [month]: {
-        ...prev[month],
-        checked: { ...prev[month]?.checked, [feeType]: isChecked },
-        amounts: { ...prev[month]?.amounts }
-      }
-    }));
-  };
-
   const handleMonthFeeAmountChange = (month, feeType, val) => {
     setMonthFees(prev => {
-      const currentMonth = prev[month] || { checked: {}, amounts: {} };
+      const currentMonth = prev[month] || { amounts: {} };
       return {
         ...prev,
         [month]: {
           ...currentMonth,
-          amounts: { ...currentMonth.amounts, [feeType]: val },
-          checked: { ...currentMonth.checked, [feeType]: true }
+          amounts: { ...currentMonth.amounts, [feeType]: val }
         }
       };
     });
@@ -150,14 +136,13 @@ export default function FeeEntry() {
   let grandTotal = 0;
 
   selectedMonths.forEach(month => {
-    const monthData = monthFees[month] || { checked: {}, amounts: {} };
+    const monthData = monthFees[month] || { amounts: {} };
     FEE_TYPES.forEach(fee => {
-      if (monthData.checked[fee]) {
-        const amount = Number(monthData.amounts[fee]) || 0;
-        if (amount > 0) {
-          aggregatedFees[fee] = (aggregatedFees[fee] || 0) + amount;
-          grandTotal += amount;
-        }
+      // Only count if an amount is entered
+      const amount = Number(monthData.amounts[fee]) || 0;
+      if (amount > 0) {
+        aggregatedFees[fee] = (aggregatedFees[fee] || 0) + amount;
+        grandTotal += amount;
       }
     });
   });
@@ -165,7 +150,7 @@ export default function FeeEntry() {
   const handleSubmit = async () => {
     if (!selectedStudent) return alert("দয়া করে শিক্ষার্থী নির্বাচন করুন।");
     if (selectedMonths.length === 0) return alert("অন্তত একটি মাস নির্বাচন করুন।");
-    if (grandTotal <= 0) return alert("ফি এর পরিমাণ শূন্য হতে পারে না।");
+    if (grandTotal <= 0) return alert("কোনো ফি এর পরিমাণ দেওয়া হয়নি।");
 
     let finalInvoiceNo = invoiceNo;
     if (!finalInvoiceNo || finalInvoiceNo.trim() === "") {
@@ -246,7 +231,6 @@ export default function FeeEntry() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">ম্যানুয়াল এন্ট্রির মাধ্যমে ফি গ্রহণ করুন অথবা বাল্ক ইম্পোর্ট করুন।</p>
         </div>
         
-        {/* Bulk Upload Page এ যাওয়ার বাটন */}
         <div>
           <Button 
             variant="outline" 
@@ -350,14 +334,18 @@ export default function FeeEntry() {
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 mb-4">
                       <Input 
-                        label="Invoice / Memo No (ফাঁকা রাখলে অটো জেনারেট হবে)" 
+                        label="Invoice / Memo No (অটো জেনারেট)" 
                         value={invoiceNo} 
                         onChange={(e) => setInvoiceNo(e.target.value)} 
                         placeholder="e.g. WSC-000001"
                       />
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Invoice Date</label>
-                        <DatePicker value={invoiceDate} onChange={(date) => setInvoiceDate(date)} />
+                      
+                      <div className="relative z-40">
+                        <DatePicker 
+                          label="Invoice Date" 
+                          value={invoiceDate} 
+                          onChange={(date) => setInvoiceDate(date)} 
+                        />
                       </div>
                     </div>
 
@@ -374,18 +362,15 @@ export default function FeeEntry() {
                         <TabsContent key={`content-${month}`} value={month}>
                           <div className="space-y-3 p-1">
                             {FEE_TYPES.map(fee => {
-                              const monthData = monthFees[month] || { checked: {}, amounts: {} };
-                              const isChecked = monthData.checked[fee] || false;
+                              const monthData = monthFees[month] || { amounts: {} };
                               const amount = monthData.amounts[fee] || "";
 
                               return (
-                                <div key={`row-${month}-${fee}`} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${isChecked ? 'border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-900/10' : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}>
+                                <div key={`row-${month}-${fee}`} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50 mb-2 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                                   <div className="flex-1">
-                                    <Checkbox 
-                                      label={fee} 
-                                      checked={isChecked}
-                                      onChange={(e) => handleMonthFeeCheck(month, fee, e.target.checked)}
-                                    />
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                      {fee}
+                                    </span>
                                   </div>
                                   <div className="w-1/3 min-w-[120px]">
                                     <Input 

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getTeachers, saveDailyAttendance, getAttendanceByDate } from "../services/teacherService";
-import { UploadCloud, FileText, Printer, Save, CheckCircle2, LayoutDashboard, FileSearch, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, Printer, Save, CheckCircle2, LayoutDashboard, FileSearch, Loader2, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import AttendanceReportTemplate from "@/templates/pdf/AttendanceReportTemplate";
 
 export default function TeacherAttendance() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [teachers, setTeachers] = useState([]);
+  const [activeTeachers, setActiveTeachers] = useState([]); // Only active staff
   
   // Dashboard State
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -16,7 +16,7 @@ export default function TeacherAttendance() {
   // Upload State
   const [selectedDate, setSelectedDate] = useState(todayString);
   const [previewData, setPreviewData] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState(null); // null means no upload active
+  const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
   
   // Report State
@@ -30,19 +30,26 @@ export default function TeacherAttendance() {
 
   const fetchInitialData = async () => {
     const tData = await getTeachers();
-    setTeachers(tData.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId)));
     
-    // Fetch today's data for dashboard
+    // STRICTLY FILTER OUT EX-TEACHERS for Attendance Module
+    const filteredActive = tData
+      .filter(t => t.status !== "Ex-Teacher" && t.status !== "Resigned")
+      .sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId));
+      
+    setActiveTeachers(filteredActive);
+    
+    // Fetch today's data for dashboard (Filter against active staff)
     const todayData = await getAttendanceByDate(todayString);
-    setTodayAttendance(todayData);
+    const validTodayData = todayData.filter(d => filteredActive.some(t => t.teacherId === d.teacherId));
+    setTodayAttendance(validTodayData);
   };
 
-  // --- UPLOAD & PARSE LOGIC WITH ANIMATION ---
+  // --- UPLOAD & PARSE LOGIC ---
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    setUploadProgress(0); // Start animation
+    setUploadProgress(0);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -59,7 +66,8 @@ export default function TeacherAttendance() {
         }
       });
 
-      const attendancePreview = teachers.map(t => {
+      // Match ONLY against active teachers
+      const attendancePreview = activeTeachers.map(t => {
         const timeScanned = parsedTxtData[t.teacherId];
         return {
           teacherId: t.teacherId,
@@ -70,7 +78,6 @@ export default function TeacherAttendance() {
         };
       });
 
-      // Simulate processing time for UX animation
       let progress = 0;
       const interval = setInterval(() => {
         progress += 15;
@@ -83,7 +90,7 @@ export default function TeacherAttendance() {
             setPreviewData(attendancePreview);
             setUploadProgress(null);
             toast.success("File parsed successfully!");
-            if (fileInputRef.current) fileInputRef.current.value = ""; // reset input
+            if (fileInputRef.current) fileInputRef.current.value = ""; 
           }, 400);
         }
       }, 100);
@@ -97,7 +104,7 @@ export default function TeacherAttendance() {
       await saveDailyAttendance(selectedDate, previewData);
       toast.success(`Attendance saved for ${selectedDate}`);
       setPreviewData([]);
-      if (selectedDate === todayString) fetchInitialData(); // Update dashboard if today
+      if (selectedDate === todayString) fetchInitialData(); 
     } catch (err) {
       toast.error("Error saving attendance.");
     }
@@ -106,8 +113,18 @@ export default function TeacherAttendance() {
   // --- REPORT LOGIC ---
   const fetchReport = async () => {
     const data = await getAttendanceByDate(reportDate);
-    if(data.length === 0) toast.error("No records found for this date.");
-    setReportData(data.sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId)));
+    if(data.length === 0) {
+      toast.error("No records found for this date.");
+      setReportData([]);
+      return;
+    }
+    
+    // Ensure Ex-Teachers are NOT in the report
+    const validReportData = data
+      .filter(d => activeTeachers.some(t => t.teacherId === d.teacherId))
+      .sort((a, b) => parseInt(a.teacherId) - parseInt(b.teacherId));
+      
+    setReportData(validReportData);
   };
 
   return (
@@ -129,10 +146,15 @@ export default function TeacherAttendance() {
       {/* --- TAB 1: DASHBOARD --- */}
       {activeTab === "dashboard" && (
         <div className="space-y-6 animate-in fade-in">
+          <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 p-4 rounded-xl flex gap-3 items-center text-sm font-medium text-blue-800 dark:text-blue-300">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p>Attendance system only processes and generates reports for currently active staff. Ex-Teachers are automatically excluded from all attendance metrics.</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white dark:bg-[#1a2235] p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-              <h3 className="text-slate-500 dark:text-slate-400 font-bold uppercase text-sm mb-2">Total Teachers</h3>
-              <p className="text-4xl font-black text-slate-800 dark:text-white">{teachers.length}</p>
+              <h3 className="text-slate-500 dark:text-slate-400 font-bold uppercase text-sm mb-2">Active Staff</h3>
+              <p className="text-4xl font-black text-slate-800 dark:text-white">{activeTeachers.length}</p>
             </div>
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
               <h3 className="text-emerald-600 dark:text-emerald-400 font-bold uppercase text-sm mb-2">Present Today</h3>
@@ -199,14 +221,13 @@ export default function TeacherAttendance() {
                 type="date" 
                 value={selectedDate} 
                 onChange={e => setSelectedDate(e.target.value)} 
-                className="w-full p-3 border border-slate-300 dark:border-blue-500/50 rounded-xl bg-white dark:bg-[#151c2c] text-slate-900 dark:text-white dark:[color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium" 
+                className="w-full p-3 border border-slate-300 dark:border-blue-500/50 rounded-xl bg-white dark:bg-[#151c2c] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium" 
               />
             </div>
             
             <div className="bg-slate-50 dark:bg-[#1e293b] p-6 rounded-xl border border-slate-200 dark:border-slate-700/50 flex flex-col justify-center">
               <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">2. Upload Device .TXT File:</label>
               
-              {/* Custom Upload Button UI */}
               <input 
                 type="file" 
                 accept=".txt" 
@@ -223,7 +244,6 @@ export default function TeacherAttendance() {
                 Choose .TXT File
               </label>
 
-              {/* Upload Progress Animation */}
               {uploadProgress !== null && (
                 <div className="mt-4">
                   <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
@@ -246,14 +266,14 @@ export default function TeacherAttendance() {
                 <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500"/> Preview Data
                 </h3>
-                <span className="text-sm font-medium text-slate-500 bg-slate-100 dark:bg-[#1e293b] px-3 py-1 rounded-full">Missing IDs automatically marked Absent</span>
+                <span className="text-sm font-medium text-slate-500 bg-slate-100 dark:bg-[#1e293b] px-3 py-1 rounded-full">Ex-Teachers omitted. Missing IDs marked Absent.</span>
               </div>
               
               <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl mb-6">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-800 text-white">
                     <tr>
-                      <th className="p-4 font-semibold">Teacher ID</th>
+                      <th className="p-4 font-semibold">Staff ID</th>
                       <th className="p-4 font-semibold">Name</th>
                       <th className="p-4 font-semibold">Punch Time</th>
                       <th className="p-4 font-semibold text-center">Status</th>
@@ -294,7 +314,7 @@ export default function TeacherAttendance() {
                 type="date" 
                 value={reportDate} 
                 onChange={e => setReportDate(e.target.value)} 
-                className="w-full max-w-[200px] p-2.5 border border-slate-300 dark:border-blue-500/50 rounded-xl bg-white dark:bg-[#151c2c] text-slate-900 dark:text-white dark:[color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium" 
+                className="w-full max-w-[200px] p-2.5 border border-slate-300 dark:border-blue-500/50 rounded-xl bg-white dark:bg-[#151c2c] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium" 
               />
               <button onClick={fetchReport} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors">Fetch</button>
             </div>
@@ -310,7 +330,7 @@ export default function TeacherAttendance() {
               {reportData.length > 0 ? (
                 <PDFDownloadLink
                   document={<AttendanceReportTemplate records={reportData} date={reportDate} />}
-                  fileName={`Teachers_Attendance_${reportDate}.pdf`}
+                  fileName={`Active_Staff_Attendance_${reportDate}.pdf`}
                   className="flex-1 sm:flex-none bg-slate-800 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors shadow-lg"
                 >
                   {({ loading }) => (loading ? "Wait..." : <><Printer className="w-4 h-4"/> Get PDF</>)}
@@ -323,18 +343,17 @@ export default function TeacherAttendance() {
             </div>
           </div>
 
-          {/* HTML Preview (Corporate Style) */}
           {showPreview && reportData.length > 0 && (
             <div className="mt-8 p-8 bg-white rounded-2xl shadow-lg border border-slate-200 animate-in slide-in-from-top-4">
               <div className="text-center mb-6 pb-6 border-b-2 border-slate-800">
                 <img src="/logo.png" alt="Logo" className="w-16 h-16 mx-auto mb-2 object-contain" />
                 <h2 className="text-2xl font-black text-slate-900 uppercase tracking-wider font-serif">Western School and College</h2>
-                <h3 className="text-lg font-bold text-slate-700 mt-1">TEACHERS ATTENDANCE REPORT</h3>
+                <h3 className="text-lg font-bold text-slate-700 mt-1">STAFF ATTENDANCE REPORT</h3>
                 <p className="text-slate-500 font-medium mt-1">Date: {new Date(reportDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
               </div>
               
               <div className="flex gap-8 mb-6 font-bold text-slate-800 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <span>Subtotal: {reportData.length}</span>
+                <span>Total Active Staff: {reportData.length}</span>
                 <span className="text-emerald-600">Present: {reportData.filter(d => d.status === "P").length}</span>
                 <span className="text-red-600">Absent: {reportData.filter(d => d.status === "A").length}</span>
               </div>
@@ -343,7 +362,7 @@ export default function TeacherAttendance() {
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="p-3 border border-slate-300">ID</th>
-                    <th className="p-3 border border-slate-300">Teacher Name</th>
+                    <th className="p-3 border border-slate-300">Staff Name</th>
                     <th className="p-3 border border-slate-300">Date</th>
                     <th className="p-3 border border-slate-300">Time</th>
                     <th className="p-3 border border-slate-300 text-center font-bold">Status</th>
