@@ -161,6 +161,9 @@ export default function BulkFeeImport() {
   const [editHistoryId, setEditHistoryId] = useState(null);
   const [editHistoryForm, setEditHistoryForm] = useState({ amount: "", invoiceDate: "", memoNo: "" });
 
+  // --- NEW STATE: For Filtering Report By Class ---
+  const [selectedReportClass, setSelectedReportClass] = useState("All");
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -723,12 +726,19 @@ export default function BulkFeeImport() {
   const warningData = filteredPreviewData.filter(d => d.isWarning);
   const invalidData = filteredPreviewData.filter(d => !d.isValid && !d.isWarning);
 
+  // --- NEW: Filter data based on selected class for Report ---
+  const availableClasses = ["All", ...new Set(validData.map(d => d.class || "Unknown"))].sort();
+  
+  const reportData = selectedReportClass === "All" 
+    ? validData 
+    : validData.filter(d => (d.class || "Unknown") === selectedReportClass);
+
   const summaryByClass = {};
   const summaryByMonth = {};
   let grandTuition = 0;
   let grandExam = 0;
 
-  validData.forEach(row => {
+  reportData.forEach(row => {
      const c = row.class || "Unknown";
      if(!summaryByClass[c]) summaryByClass[c] = { tuition: 0, exam: 0, total: 0, count: 0 };
      
@@ -1119,18 +1129,32 @@ export default function BulkFeeImport() {
                     <p className="text-sm text-slate-500">Download high-quality PDF reports.</p>
                   </div>
                   
+                  {/* --- NEW CLASS FILTER DROPDOWN --- */}
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <label className="text-sm font-bold text-slate-600 dark:text-slate-300">Filter Class:</label>
+                    <select
+                      value={selectedReportClass}
+                      onChange={(e) => setSelectedReportClass(e.target.value)}
+                      className="bg-transparent border-none outline-none text-sm font-bold text-blue-600 dark:text-blue-400 cursor-pointer"
+                    >
+                      {availableClasses.map(c => (
+                        <option key={c} value={c} className="text-slate-800">{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="flex flex-wrap gap-3">
                     <PDFDownloadLink
                       document={
                         <FeeSummaryReportTemplate 
                           mode="full"
-                          validData={validData} 
+                          validData={reportData} 
                           classSummary={sortedClassSummary} 
                           monthSummary={sortedMonthSummary} 
-                          totals={{ validCount: validData.length, grandTotal: validData.reduce((a,c)=>a+c.grandTotal,0), tuition: grandTuition, exam: grandExam }}
+                          totals={{ validCount: reportData.length, grandTotal: reportData.reduce((a,c)=>a+c.grandTotal,0), tuition: grandTuition, exam: grandExam }}
                         />
                       }
-                      fileName={`Fee_Full_Report_${new Date().toISOString().split('T')[0]}.pdf`}
+                      fileName={`Fee_Full_Report_${selectedReportClass}_${new Date().toISOString().split('T')[0]}.pdf`}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center shadow-lg"
                     >
                       {({ loading }) => (loading ? "Generating PDF..." : <><Download className="w-4 h-4 mr-2"/> Download Full PDF</>)}
@@ -1140,13 +1164,13 @@ export default function BulkFeeImport() {
                       document={
                         <FeeSummaryReportTemplate 
                           mode="students"
-                          validData={validData} 
+                          validData={reportData} 
                           classSummary={[]} 
                           monthSummary={[]} 
-                          totals={{ validCount: validData.length, grandTotal: validData.reduce((a,c)=>a+c.grandTotal,0), tuition: 0, exam: 0 }}
+                          totals={{ validCount: reportData.length, grandTotal: reportData.reduce((a,c)=>a+c.grandTotal,0), tuition: 0, exam: 0 }}
                         />
                       }
-                      fileName={`Fee_Student_List_${new Date().toISOString().split('T')[0]}.pdf`}
+                      fileName={`Fee_Student_List_${selectedReportClass}_${new Date().toISOString().split('T')[0]}.pdf`}
                       className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center"
                     >
                       {({ loading }) => (loading ? "Generating PDF..." : <><Printer className="w-4 h-4 mr-2"/> Download Student Sheet</>)}
@@ -1157,12 +1181,12 @@ export default function BulkFeeImport() {
                 <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                      <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
-                        <p className="text-xs font-bold text-indigo-500 uppercase">Valid Preview</p>
-                        <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400">{validData.length}</p>
+                        <p className="text-xs font-bold text-indigo-500 uppercase">Valid Preview ({selectedReportClass})</p>
+                        <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400">{reportData.length}</p>
                      </div>
                      <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/50">
                         <p className="text-xs font-bold text-emerald-500 uppercase">Total Staging Earn</p>
-                        <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400">৳{validData.reduce((a,c)=>a+c.grandTotal,0).toLocaleString()}</p>
+                        <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400">৳{reportData.reduce((a,c)=>a+c.grandTotal,0).toLocaleString()}</p>
                      </div>
                      <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
                         <p className="text-xs font-bold text-blue-500 uppercase">Total Tuition</p>
@@ -1174,7 +1198,7 @@ export default function BulkFeeImport() {
                      </div>
                    </div>
                    <p className="text-center text-slate-500 font-medium">
-                     Please click the buttons above to download the high-quality PDF reports.
+                     Please click the buttons above to download the high-quality PDF reports for <b>{selectedReportClass === "All" ? "All Classes" : `Class ${selectedReportClass}`}</b>.
                    </p>
                 </div>
               </div>

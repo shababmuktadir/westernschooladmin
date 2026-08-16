@@ -7,14 +7,23 @@ import { useAdmitCard } from "@/features/students/hooks/useAdmitCard";
 export default function AdmitCard() {
   const { loading, generatedData, generateCards, resetGenerator } = useAdmitCard();
 
-  // বিদ্যালয়ের কনফিগারেশন
   const schoolConfig = {
-  schoolName: "Western School and College",
-  schoolLogo: "/logo.png" // সরাসরি লোকাল পাথ
-};
+    schoolName: "Western School and College",
+    schoolLogo: "/logo.png" 
+  };
 
   const handleFormSubmit = (data) => {
     generateCards(data);
+  };
+
+  const getPdfFileName = () => {
+    if (generatedData?.examDetails?.studentId) {
+      return `Admit_Card_${generatedData.examDetails.studentId}.pdf`;
+    }
+    if (generatedData?.examDetails?.selectedStudentIds?.length > 0) {
+      return `Admit_Cards_Custom_Selection.pdf`;
+    }
+    return `Admit_Cards_${generatedData?.examDetails?.targetClass || 'All'}.pdf`;
   };
 
   return (
@@ -39,7 +48,7 @@ export default function AdmitCard() {
                   schoolConfig={schoolConfig} 
                 />
               }
-              fileName={`Admit_Cards_${generatedData.examDetails.targetClass}.pdf`}
+              fileName={getPdfFileName()}
               className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition"
             >
               {({ loading }) => (loading ? 'ডকুমেন্ট প্রস্তুত করা হচ্ছে...' : 'পিডিএফ ডাউনলোড')}
