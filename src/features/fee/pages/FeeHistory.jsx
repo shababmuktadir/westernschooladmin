@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getStudents } from "@/features/students/services/studentService";
-// Note: Ensure getBulkStudentFees fetches all fee records from the database
 import { getBulkStudentFees } from "@/features/fee/services/feeService"; 
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -8,13 +7,28 @@ import Button from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown"; 
 import DatePicker from "@/components/ui/DatePicker"; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { Search, FileText, Printer, Loader2, Filter, Receipt, CalendarCheck, User, X, ChevronRight } from "lucide-react";
+import { Search, FileText, Printer, Loader2, Receipt, CalendarCheck, User, X, ChevronRight, Camera } from "lucide-react";
 
 // মাসের ক্রমানুসারে সাজানোর জন্য অর্ডার ম্যাপ
 const MONTH_ORDER = {
   "January": 1, "February": 2, "March": 3, "April": 4,
   "May": 5, "June": 6, "July": 7, "August": 8,
   "September": 9, "October": 10, "November": 11, "December": 12
+};
+
+// Custom Native DatePicker
+const CustomDatePicker = ({ label, value, onChange }) => {
+  return (
+    <div className="w-full">
+      {label && <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{label}</label>}
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f172a] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all text-slate-900 dark:text-white dark:[color-scheme:dark]"
+      />
+    </div>
+  );
 };
 
 export default function FeeHistory() {
@@ -38,7 +52,6 @@ export default function FeeHistory() {
         const studentsData = await getStudents();
         setAllStudents(studentsData.filter(s => s.status !== "Inactive"));
         
-        // Fetch ALL fee records
         const feesData = await getBulkStudentFees(); 
         setAllFees(feesData);
       } catch (error) {
@@ -60,11 +73,9 @@ export default function FeeHistory() {
     ...uniqueClasses.map(c => ({ label: c, value: c }))
   ], [uniqueClasses]);
 
-  // Aggregate and Filter Data for the Summary List
   const filteredAndAggregatedData = useMemo(() => {
     let filteredFees = allFees;
 
-    // 1. Date Filter
     if (startDate && endDate) {
       filteredFees = filteredFees.filter(f => {
         const d = new Date(f.invoiceDate);
@@ -76,13 +87,11 @@ export default function FeeHistory() {
       filteredFees = filteredFees.filter(f => new Date(f.invoiceDate) <= new Date(endDate));
     }
 
-    // 2. Class Filter
     if (classFilter) {
       const studentsInClass = allStudents.filter(s => s.class === classFilter).map(s => String(s.studentId));
       filteredFees = filteredFees.filter(f => studentsInClass.includes(String(f.studentId)));
     }
 
-    // 3. Search Filter (Name or ID)
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       filteredFees = filteredFees.filter(f => {
@@ -94,7 +103,6 @@ export default function FeeHistory() {
       });
     }
 
-    // 4. Aggregate by Student (Summary)
     const aggregated = {};
     filteredFees.forEach(fee => {
       const sId = String(fee.studentId);
@@ -120,14 +128,19 @@ export default function FeeHistory() {
       aggregated[sId].transactions.push(fee);
     });
 
-    // Convert Set to Array and Sort Chronologically by Month, then sort users alphabetically
     return Object.values(aggregated).map(item => ({
       ...item,
-      // Months are now sorted chronologically using MONTH_ORDER
       monthsPaid: Array.from(item.monthsPaid).sort((a, b) => (MONTH_ORDER[a] || 99) - (MONTH_ORDER[b] || 99))
     })).sort((a, b) => a.studentName.localeCompare(b.studentName));
 
   }, [allFees, allStudents, classFilter, startDate, endDate, searchTerm]);
+
+  // সার্চ করার পর Enter চাপলে সরাসরি ডিটেইলস পপআপ ওপেন হওয়া
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && filteredAndAggregatedData.length === 1) {
+      setSelectedStudentDetails(filteredAndAggregatedData[0]);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -147,9 +160,17 @@ export default function FeeHistory() {
       <style>{`
         @media print {
           body * { visibility: hidden; }
-          #fee-history-print, #fee-history-print * { visibility: visible; }
-          #fee-history-print { position: absolute; left: 0; top: 0; width: 100%; }
+          .print-active, .print-active * { visibility: visible; }
+          .print-active { 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            background: white !important; 
+            color: black !important;
+          }
           .no-print { display: none !important; }
+          .print-border { border: 1px solid #e2e8f0 !important; }
         }
       `}</style>
 
@@ -160,18 +181,20 @@ export default function FeeHistory() {
               <Receipt className="w-6 h-6 mr-2 text-blue-600" /> Fee History Summary
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-              শিক্ষার্থীদের ফি-এর সামারি দেখুন। বিস্তারিত দেখতে যেকোনো শিক্ষার্থীর নামের ওপর ক্লিক করুন।
+              শিক্ষার্থীদের ফি-এর সামারি দেখুন। বিস্তারিত দেখতে নামের ওপর ক্লিক করুন বা সার্চ করে Enter দিন।
             </p>
           </div>
-          <Button
-            variant="outline"
-            leftIcon={<Printer className="w-4 h-4" />}
-            onClick={handlePrint}
-            disabled={filteredAndAggregatedData.length === 0}
-            className="bg-white dark:bg-slate-800"
-          >
-            Print Report
-          </Button>
+          {!selectedStudentDetails && (
+            <Button
+              variant="outline"
+              leftIcon={<Printer className="w-4 h-4" />}
+              onClick={handlePrint}
+              disabled={filteredAndAggregatedData.length === 0}
+              className="bg-white dark:bg-slate-800 shadow-sm"
+            >
+              Print Master Report
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -190,7 +213,7 @@ export default function FeeHistory() {
               </div>
 
               <div className="md:col-span-1 overflow-visible relative z-40">
-                <DatePicker 
+                <CustomDatePicker 
                   label="Start Date"
                   value={startDate}
                   onChange={(val) => setStartDate(val)}
@@ -198,7 +221,7 @@ export default function FeeHistory() {
               </div>
 
               <div className="md:col-span-1 overflow-visible relative z-40">
-                <DatePicker 
+                <CustomDatePicker 
                   label="End Date"
                   value={endDate}
                   onChange={(val) => setEndDate(val)}
@@ -213,7 +236,8 @@ export default function FeeHistory() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by ID or Name..."
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Search by ID/Name & Press Enter"
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f172a] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all dark:text-white"
                   />
                 </div>
@@ -224,8 +248,8 @@ export default function FeeHistory() {
         </Card>
 
         {/* Summary Table */}
-        <div id="fee-history-print" ref={printRef} className="relative z-10">
-          <Card className="shadow-md">
+        <div className={`relative z-10 ${!selectedStudentDetails ? 'print-active' : 'no-print'}`}>
+          <Card className="shadow-sm border-slate-200 dark:border-slate-800">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <CardTitle className="text-lg">
                 All History List 
@@ -245,17 +269,17 @@ export default function FeeHistory() {
                 <div className="text-center py-16 text-slate-500 bg-slate-50 dark:bg-slate-800/20">
                   <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-300">No records found</p>
-                  <p className="text-sm mt-1">Try adjusting your class or date filters, or search for another student.</p>
+                  <p className="text-sm mt-1">Try adjusting your filters or search for another student.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto max-h-[600px]">
+                <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
                   <Table>
                     <TableHeader className="sticky top-0 bg-slate-100 dark:bg-slate-800 shadow-sm z-10">
                       <TableRow>
                         <TableHead className="w-24">ID</TableHead>
-                        <TableHead className="w-48">Student Name</TableHead>
+                        <TableHead className="w-64">Student Name</TableHead>
                         <TableHead className="w-24">Class</TableHead>
-                        <TableHead className="w-64">Summary: Months Paid</TableHead>
+                        <TableHead className="w-64">Cleared Months</TableHead>
                         <TableHead className="text-right w-32">Total Paid (৳)</TableHead>
                         <TableHead className="w-10 no-print"></TableHead>
                       </TableRow>
@@ -275,7 +299,10 @@ export default function FeeHistory() {
                               <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                 <User className="w-4 h-4" />
                               </div>
-                              <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{data.studentName}</span>
+                              <div>
+                                <span className="block group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{data.studentName}</span>
+                                <span className="text-[10px] text-slate-400">Click to view details</span>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-slate-600 dark:text-slate-400">
@@ -294,8 +321,8 @@ export default function FeeHistory() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400 text-lg">
-                            {data.totalPaid.toLocaleString()}
+                          <TableCell className="text-right font-black text-blue-600 dark:text-blue-400 text-base">
+                            ৳ {data.totalPaid.toLocaleString()}
                           </TableCell>
                           <TableCell className="text-center no-print">
                             <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
@@ -311,90 +338,114 @@ export default function FeeHistory() {
         </div>
       </div>
 
-      {/* Details Modal */}
+      {/* Details Modal / Printable Statement */}
       {selectedStudentDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 no-print">
+          
+          <div className={`bg-white dark:bg-[#1e293b] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${selectedStudentDetails ? 'print-active' : ''}`}>
             
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50/50 dark:bg-slate-900">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 border border-blue-200 dark:border-blue-800 shrink-0">
-                  <User className="w-7 h-7" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white uppercase">
-                    {selectedStudentDetails.studentName}
-                  </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    <span className="font-semibold">ID:</span> {selectedStudentDetails.studentId} • <span className="font-semibold">Class:</span> {selectedStudentDetails.className}
-                  </p>
-                </div>
+            {/* Modal Actions Header (Hidden on Print) */}
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-[#151c2c] no-print">
+              <div className="flex items-center gap-3">
+                <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20" leftIcon={<Printer className="w-4 h-4"/>}>
+                  Print / Save PDF
+                </Button>
               </div>
               <button 
                 onClick={() => setSelectedStudentDetails(null)}
-                className="p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"
+                className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/50 flex-1">
-              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">
-                Full Transaction History
+            {/* Printable Content Area */}
+            <div className="p-8 overflow-y-auto custom-scrollbar bg-white dark:bg-[#1e293b] flex-1 text-slate-900 dark:text-slate-100 print:overflow-visible print:p-0 print:m-0">
+              
+              {/* School Header */}
+              <div className="text-center mb-8 border-b-2 border-slate-800 dark:border-slate-600 pb-6">
+                <h2 className="text-3xl font-black uppercase tracking-wider font-serif text-slate-900 dark:text-white print:text-black">Western School and College</h2>
+                <h3 className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-1 print:text-gray-700">STUDENT FEE STATEMENT</h3>
+                <p className="text-sm font-medium text-slate-500 mt-2">Date Generated: {new Date().toLocaleDateString('en-GB')}</p>
+              </div>
+
+              {/* Student Info Box */}
+              <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 print-border">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student Name</p>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white print:text-black">{selectedStudentDetails.studentName}</h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student ID & Class</p>
+                  <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400 print:text-indigo-800">
+                    ID: {selectedStudentDetails.studentId} <span className="text-slate-400 font-normal mx-1">|</span> {selectedStudentDetails.className}
+                  </p>
+                </div>
+              </div>
+
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">
+                Transaction History
               </h3>
               
-              <div className="space-y-4">
-                {selectedStudentDetails.transactions.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate)).map((tx, i) => (
-                  <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 border-b border-slate-100 dark:border-slate-700/50 pb-4 gap-4">
-                      <div>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50 mb-2">
-                          Memo No: {tx.invoiceNo || tx.memoNo || "N/A"}
-                        </span>
-                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                          <CalendarCheck className="w-4 h-4 text-slate-400" />
-                          Paid on: {formatDisplayDate(tx.invoiceDate)}
-                        </div>
-                      </div>
-                      <div className="text-left sm:text-right">
-                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Amount Paid</p>
-                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">৳{Number(tx.grandTotal).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Fee Breakdown</p>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(tx.feeDetails || {}).map(([key, val]) => (
-                            <span key={key} className="px-3 py-1.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300">
-                              {key}: <span className="font-bold text-slate-900 dark:text-white">৳{val}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {tx.selectedMonths && tx.selectedMonths.length > 0 && (
-                        <div>
-                           <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Months Covered</p>
-                           <div className="flex flex-wrap gap-1.5">
-                             {/* Months inside details modal are also sorted chronologically */}
-                             {tx.selectedMonths.slice().sort((a, b) => (MONTH_ORDER[a] || 99) - (MONTH_ORDER[b] || 99)).map(m => (
-                               <span key={m} className="px-3 py-1.5 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-100 dark:border-purple-800/50 rounded-lg text-sm font-semibold">
-                                 {m}
-                               </span>
-                             ))}
-                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                ))}
+              <div className="overflow-x-auto print:overflow-visible">
+                <table className="w-full text-left text-sm border-collapse border border-slate-300 print-border">
+                  <thead className="bg-slate-100 dark:bg-slate-800">
+                    <tr>
+                      <th className="p-3 border border-slate-300 print-border font-bold">Payment Date</th>
+                      <th className="p-3 border border-slate-300 print-border font-bold">Memo / Invoice No.</th>
+                      <th className="p-3 border border-slate-300 print-border font-bold">Allocated Months</th>
+                      <th className="p-3 border border-slate-300 print-border font-bold">Fee Breakdown</th>
+                      <th className="p-3 border border-slate-300 print-border font-bold text-right">Total (৳)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedStudentDetails.transactions.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate)).map((tx, i) => {
+                      const sortedTxMonths = tx.selectedMonths ? [...tx.selectedMonths].sort((a,b) => MONTH_ORDER[a] - MONTH_ORDER[b]) : [];
+                      return (
+                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        <td className="p-3 border border-slate-300 print-border font-medium text-slate-700 dark:text-slate-300">
+                          {formatDisplayDate(tx.invoiceDate)}
+                        </td>
+                        <td className="p-3 border border-slate-300 print-border text-slate-600 dark:text-slate-400 font-mono text-xs">
+                          {tx.invoiceNo || tx.memoNo || "N/A"}
+                        </td>
+                        <td className="p-3 border border-slate-300 print-border">
+                          <div className="flex flex-wrap gap-1">
+                            {sortedTxMonths.length > 0 ? sortedTxMonths.map(m => (
+                              <span key={m} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-transparent dark:text-slate-300 rounded text-[10px] font-bold uppercase print:border print:border-slate-300 print:text-black">
+                                {m.substring(0,3)}
+                              </span>
+                            )) : <span className="text-xs text-slate-400">-</span>}
+                          </div>
+                        </td>
+                        <td className="p-3 border border-slate-300 print-border">
+                          <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-400">
+                            {Object.entries(tx.feeDetails || {}).map(([key, val]) => (
+                              <span key={key}>{key}: <b>৳{val}</b></span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3 border border-slate-300 print-border text-right font-bold text-slate-900 dark:text-white print:text-black">
+                          ৳{Number(tx.grandTotal).toLocaleString()}
+                        </td>
+                      </tr>
+                    )})}
+                    <tr className="bg-slate-50 dark:bg-slate-800/50">
+                      <td colSpan="4" className="p-4 border border-slate-300 print-border text-right font-black uppercase text-slate-700 dark:text-slate-300">Grand Total Paid:</td>
+                      <td className="p-4 border border-slate-300 print-border text-right font-black text-lg text-emerald-600 dark:text-emerald-400 print:text-black">
+                        ৳{selectedStudentDetails.totalPaid.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
+              
+              {/* Footer text on Print */}
+              <div className="mt-12 text-center text-xs text-slate-400 font-medium hidden print:block">
+                This is a computer-generated statement and does not require a physical signature.
+              </div>
 
+            </div>
           </div>
         </div>
       )}

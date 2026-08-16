@@ -8,8 +8,12 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { UploadCloud, CheckCircle2, AlertTriangle, Save, Edit2, Download, X, Check, Loader2, Trash2, Settings, Database, ArrowRight, History, CalendarCheck, User, Info, Printer } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertTriangle, Save, Edit2, Download, X, Check, Loader2, Trash2, AlertOctagon, Settings, Database, ArrowRight, History, CalendarCheck, User, Info, Printer, Search } from "lucide-react";
 import toast from "react-hot-toast";
+
+// PDF Imports
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import FeeSummaryReportTemplate from "@/templates/pdf/FeeSummaryReportTemplate";
 
 const ALL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTH_ORDER = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 };
@@ -26,13 +30,24 @@ const CLASS_ORDER = {
 };
 
 const getClassRank = (c) => {
+  if (!c) return 99;
   const u = String(c).trim();
   if (CLASS_ORDER[u]) return CLASS_ORDER[u];
-  const n = parseInt(u);
+  const n = parseInt(u.replace(/[^0-9]/g, ''));
   if (!isNaN(n)) return n + 3; 
   return 99; 
 };
 
+// --- Advanced Amount Parser ---
+const parseAmount = (rawAmount) => {
+  if (rawAmount === undefined || rawAmount === null || rawAmount === "") return 0;
+  if (typeof rawAmount === 'number') return rawAmount;
+  const cleanedString = String(rawAmount).replace(/,/g, '').trim();
+  const parsed = parseFloat(cleanedString);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// --- Advanced Date Parser ---
 const parseExcelDate = (excelDate) => {
   if (!excelDate) return new Date().toISOString().split("T")[0];
   if (typeof excelDate === 'number') {
@@ -61,17 +76,60 @@ const parseExcelDate = (excelDate) => {
   return new Date().toISOString().split("T")[0];
 };
 
+// --- Advanced Month Extractor ---
+const extractMonths = (rawMonthStr, fallbackDateStr) => {
+  const getFallback = () => {
+    const d = new Date(fallbackDateStr);
+    return isNaN(d) ? [new Date().toLocaleString('en-US', { month: 'long' })] : [d.toLocaleString('en-US', { month: 'long' })];
+  };
+
+  if (!rawMonthStr) return getFallback();
+
+  const str = String(rawMonthStr).toLowerCase().trim();
+  const matches = str.match(/[a-z]{3,}/g) || [];
+  
+  const monthPrefixes = {
+    jan: "January", feb: "February", fab: "February", mar: "March",
+    apr: "April", may: "May", jun: "June", jul: "July",
+    aug: "August", sep: "September", oct: "October", nov: "November", dec: "December"
+  };
+
+  const found = [];
+  matches.forEach(m => {
+    const prefix = m.substring(0, 3);
+    if (monthPrefixes[prefix] && !found.includes(monthPrefixes[prefix])) {
+      found.push(monthPrefixes[prefix]);
+    }
+  });
+
+  if (found.length === 0) {
+    const numMatches = str.match(/\b(0?[1-9]|1[0-2])\b/g);
+    if (numMatches) {
+      numMatches.forEach(n => {
+        const idx = parseInt(n, 10) - 1;
+        if(ALL_MONTHS[idx] && !found.includes(ALL_MONTHS[idx])) {
+          found.push(ALL_MONTHS[idx]);
+        }
+      });
+    }
+  }
+  return found.length > 0 ? found : getFallback();
+};
+
 const sortDataByClassAndId = (a, b) => {
   const classA = a.class || "";
   const classB = b.class || "";
   const rankA = getClassRank(classA);
   const rankB = getClassRank(classB);
-  
   if (rankA !== rankB) return rankA - rankB;
   
   const idA = parseInt(a.studentId) || 0;
   const idB = parseInt(b.studentId) || 0;
-  return idA - idB;
+  if (idA !== idB) return idA - idB;
+
+  const dateA = new Date(a.invoiceDate).getTime();
+  const dateB = new Date(b.invoiceDate).getTime();
+  return dateA - dateB;
 };
 
 export default function BulkFeeImport() {
@@ -82,6 +140,7 @@ export default function BulkFeeImport() {
   const [examFeeRate, setExamFeeRate] = useState(500);
 
   const [previewData, setPreviewData] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -90,7 +149,7 @@ export default function BulkFeeImport() {
   const [activeTab, setActiveTab] = useState("valid"); 
 
   const [editingIndex, setEditingIndex] = useState(null);
-  const [editForm, setEditForm] = useState({ studentId: "", amount: "", invoiceDate: "" });
+  const [editForm, setEditForm] = useState({ studentId: "", amount: "", invoiceDate: "", memoNo: "", months: "" });
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyStudent, setHistoryStudent] = useState({ id: "", name: "" });
@@ -115,7 +174,7 @@ export default function BulkFeeImport() {
       const map = {};
       feeData.forEach(record => {
         const sId = String(record.studentId).trim();
-        if (!map[sId]) map[sId] = { paidTuitionMonths: [], dates: [], history: [] };
+        if (!map[sId]) map[sId] = { paidTuitionMonths: [], history: [], dates: [] };
         
         map[sId].history.push(record);
         if (record.invoiceDate && !map[sId].dates.includes(record.invoiceDate)) {
@@ -160,23 +219,26 @@ export default function BulkFeeImport() {
     return { monthlyRate: amount, examFee: 0, monthCount: 1, matched: false, tuitionTotal: amount };
   };
 
-  const allocateMonthsAndFees = (studentId, rawDate, amountPaid, isEdit = false) => {
+  const allocateMonthsAndFees = (studentId, rawDate, amountPaid, sheetAssignedMonthsObj) => {
     const { monthlyRate, examFee, monthCount, matched, tuitionTotal } = deduceFeeBreakdown(amountPaid);
     let assignedMonths = [];
     
     if (monthCount > 0 && studentId) {
         const paidMonthsDB = dbFeeMap[studentId]?.paidTuitionMonths || [];
-        const allPaidTuition = isEdit ? paidMonthsDB : [...paidMonthsDB];
+        const alreadyAssigned = sheetAssignedMonthsObj[studentId] || [];
+        const allPaidTuition = [...paidMonthsDB, ...alreadyAssigned];
+        
         const unpaidMonths = ALL_MONTHS.filter(m => !allPaidTuition.includes(m));
         
         assignedMonths = unpaidMonths.slice(0, monthCount);
         if (assignedMonths.length === 0) {
-            const d = new Date(rawDate);
-            assignedMonths = isNaN(d) ? ["January"] : [d.toLocaleString('en-US', { month: 'long' })];
+            assignedMonths = extractMonths("", rawDate);
+        } else {
+           if (!sheetAssignedMonthsObj[studentId]) sheetAssignedMonthsObj[studentId] = [];
+           sheetAssignedMonthsObj[studentId].push(...assignedMonths);
         }
     } else if (monthCount === 0 && amountPaid > 0) {
-         const d = new Date(rawDate);
-         assignedMonths = isNaN(d) ? ["January"] : [d.toLocaleString('en-US', { month: 'long' })];
+         assignedMonths = extractMonths("", rawDate);
     }
 
     assignedMonths.sort((a,b) => MONTH_ORDER[a] - MONTH_ORDER[b]);
@@ -217,6 +279,83 @@ export default function BulkFeeImport() {
     };
   };
 
+  const allocateManualMonthsAndFees = (rawDate, amountPaid, explicitMonths) => {
+    const monthCount = explicitMonths.length;
+    const rates = getParsedTuitionRates();
+    const examRate = Number(examFeeRate) || 500;
+
+    let monthlyRate = 0;
+    let rowExamFee = 0;
+    let matched = true;
+
+    if (monthCount > 0) {
+        if (rates.includes(amountPaid / monthCount)) {
+            monthlyRate = amountPaid / monthCount;
+        } else if (rates.includes((amountPaid - examRate) / monthCount)) {
+            monthlyRate = (amountPaid - examRate) / monthCount;
+            rowExamFee = examRate;
+        } else {
+            monthlyRate = amountPaid / monthCount;
+            matched = false;
+        }
+    } else {
+        if (amountPaid === examRate) {
+            rowExamFee = examRate;
+        } else {
+            matched = false;
+        }
+    }
+
+    let feeDetails = {};
+    if (monthlyRate > 0) feeDetails["Tuition fee"] = monthlyRate * monthCount;
+    if (rowExamFee > 0) feeDetails["Exam fee"] = rowExamFee;
+
+    let monthWiseDetails = {};
+    let allocatedDetailsArray = [];
+
+    explicitMonths.forEach((m, idx) => {
+        monthWiseDetails[m] = { checked: {}, amounts: {} };
+        let examForThisMonth = 0;
+        if (monthlyRate > 0) {
+            monthWiseDetails[m].checked["Tuition fee"] = true;
+            monthWiseDetails[m].amounts["Tuition fee"] = monthlyRate;
+        }
+        if (rowExamFee > 0 && idx === explicitMonths.length - 1) {
+            monthWiseDetails[m].checked["Exam fee"] = true;
+            monthWiseDetails[m].amounts["Exam fee"] = rowExamFee;
+            examForThisMonth = rowExamFee;
+        }
+        allocatedDetailsArray.push({ month: m, tuition: monthlyRate, exam: examForThisMonth, total: monthlyRate + examForThisMonth });
+    });
+
+    return {
+        selectedMonths: explicitMonths,
+        feeDetails,
+        monthWiseDetails,
+        allocatedDetailsArray,
+        logicMatched: matched,
+        monthlyRate,
+        examFee: rowExamFee
+    };
+  };
+
+  const recalculateAllRows = (rows) => {
+    const sheetAssignedMonths = {};
+    const processed = rows.map(r => {
+      if (r.isManualOverride) {
+        const allocation = allocateManualMonthsAndFees(r.invoiceDate, r.grandTotal, r.selectedMonths);
+        if (!sheetAssignedMonths[r.studentId]) sheetAssignedMonths[r.studentId] = [];
+        sheetAssignedMonths[r.studentId].push(...allocation.selectedMonths);
+        return { ...r, ...allocation };
+      } else {
+        const allocation = allocateMonthsAndFees(r.studentId, r.invoiceDate, r.grandTotal, sheetAssignedMonths);
+        return { ...r, ...allocation };
+      }
+    });
+    processed.sort(sortDataByClassAndId);
+    return processed;
+  };
+
   const revalidateData = (rows, studentList, dbMap) => {
     return rows.map(row => {
       let errorReasons = [];
@@ -225,6 +364,7 @@ export default function BulkFeeImport() {
 
       const matchedStudent = studentList.find((s) => String(s.studentId) === studentId);
       const dbDates = dbMap[studentId]?.dates || [];
+      const dbPaidMonths = dbMap[studentId]?.paidTuitionMonths || [];
 
       if (!studentId) errorReasons.push("ID missing in Sheet");
       else if (!matchedStudent) errorReasons.push("ID not found in System DB");
@@ -236,8 +376,36 @@ export default function BulkFeeImport() {
         errorReasons.push(`Duplicate Date: ${row.invoiceDate} already exists in DB`);
       }
 
+      const allMonthsCombined = [...new Set([...dbPaidMonths, ...(row.selectedMonths || [])])];
+      allMonthsCombined.sort((a,b) => MONTH_ORDER[a] - MONTH_ORDER[b]);
+      let gapDetected = false;
+      let missingList = [];
+      
+      for (let i = 1; i < allMonthsCombined.length; i++) {
+        const prev = MONTH_ORDER[allMonthsCombined[i-1]];
+        const curr = MONTH_ORDER[allMonthsCombined[i]];
+        if (curr - prev > 1) {
+          gapDetected = true;
+          for(let j = prev + 1; j < curr; j++) {
+            missingList.push(ALL_MONTHS[j-1]);
+          }
+        }
+      }
+
       errorReasons = [...new Set(errorReasons)];
-      const isValid = errorReasons.length === 0;
+      let isValid = errorReasons.length === 0;
+      let isWarning = false;
+
+      if (isValid && gapDetected) {
+        if (row.gapRejected) {
+          isValid = false;
+          errorReasons.push(`Gap Rejected. Missing: ${missingList.join(", ")}`);
+        } else if (!row.gapApproved) {
+          isValid = false;
+          isWarning = true;
+          row.missingList = missingList;
+        }
+      }
 
       return {
         ...row,
@@ -245,7 +413,9 @@ export default function BulkFeeImport() {
         class: matchedStudent ? matchedStudent.class : "",
         roll: matchedStudent ? matchedStudent.roll : "",
         phone: matchedStudent ? matchedStudent.contactNumber : "",
+        dbPaidMonths: [...dbPaidMonths].sort((a,b) => MONTH_ORDER[a] - MONTH_ORDER[b]), 
         isValid,
+        isWarning,
         errorReason: errorReasons.join(", "),
       };
     });
@@ -257,6 +427,7 @@ export default function BulkFeeImport() {
 
     setIsUploading(true);
     setPreviewData([]);
+    setActiveTab("valid");
     
     try {
       const buffer = await file.arrayBuffer();
@@ -275,10 +446,8 @@ export default function BulkFeeImport() {
 
         const rawId = String(normRow["PARTICULARS"] ?? normRow["STUDENT ID"] ?? normRow["ID"] ?? "").trim();
         const rawDate = parseExcelDate(normRow["DATE"]);
-        const amountPaid = Number(normRow["CREDIT"] ?? normRow["AMOUNT"] ?? 0);
+        const amountPaid = parseAmount(normRow["CREDIT"] ?? normRow["AMOUNT"] ?? normRow["TOTAL"] ?? 0);
         const generatedMemo = `BLK-${Date.now().toString().slice(-6)}-${index}`;
-
-        const allocation = allocateMonthsAndFees(rawId, rawDate, amountPaid);
 
         return {
           studentId: rawId,
@@ -288,15 +457,19 @@ export default function BulkFeeImport() {
           paymentMethod: "Bank",
           grandTotal: amountPaid,
           remarks: "Uploaded via Bulk Import",
-          ...allocation
+          gapApproved: false,
+          gapRejected: false,
+          isManualOverride: false
         };
       });
 
-      let validatedData = revalidateData(rawRows, students, dbFeeMap);
-      validatedData.sort(sortDataByClassAndId);
+      rawRows.sort(sortDataByClassAndId);
+
+      const allocatedRows = recalculateAllRows(rawRows);
+      const validatedData = revalidateData(allocatedRows, students, dbFeeMap);
 
       setPreviewData(validatedData);
-      toast.success("File processed successfully!");
+      toast.success("File uploaded to temporary staging preview!");
     } catch (error) {
       console.error("Excel processing failed:", error);
       toast.error("Excel file processing failed. Please check the format.");
@@ -306,53 +479,98 @@ export default function BulkFeeImport() {
     }
   };
 
-  const saveEdit = (index) => {
+  const saveEdit = (realIdx) => {
     const newData = [...previewData];
-    let row = { ...newData[index] };
+    let row = { ...newData[realIdx] };
     
     row.studentId = editForm.studentId;
     row.invoiceDate = editForm.invoiceDate;
-    const newAmount = Number(editForm.amount);
+    row.memoNo = editForm.memoNo;
+    row.grandTotal = parseAmount(editForm.amount);
+    
+    const parsedMonths = extractMonths(editForm.months, row.invoiceDate);
+    row.selectedMonths = parsedMonths;
+    row.isManualOverride = true;
+    row.gapApproved = false;
+    row.gapRejected = false;
+    
+    newData[realIdx] = row;
+    
+    const updatedData = recalculateAllRows(newData);
+    const revalidatedData = revalidateData(updatedData, students, dbFeeMap);
 
-    const allocation = allocateMonthsAndFees(row.studentId, row.invoiceDate, newAmount, true);
-    
-    row.grandTotal = newAmount;
-    row.selectedMonths = allocation.selectedMonths;
-    row.feeDetails = allocation.feeDetails;
-    row.monthWiseDetails = allocation.monthWiseDetails;
-    row.allocatedDetailsArray = allocation.allocatedDetailsArray;
-    row.logicMatched = allocation.logicMatched;
-    row.monthlyRate = allocation.monthlyRate;
-    row.examFee = allocation.examFee;
-    
-    newData[index] = row;
-    
-    let revalidatedData = revalidateData(newData, students, dbFeeMap);
     setPreviewData(revalidatedData);
     setEditingIndex(null);
     toast.success("Row updated and re-calculated!");
   };
 
-  const handleDeleteRow = (index) => {
+  const handleDeleteRow = (realIdx) => {
     const newData = [...previewData];
-    newData.splice(index, 1);
-    setPreviewData(newData);
+    newData.splice(realIdx, 1);
+    
+    const updatedData = recalculateAllRows(newData);
+    const revalidatedData = revalidateData(updatedData, students, dbFeeMap);
+
+    setPreviewData(revalidatedData);
     setEditingIndex(null);
   };
 
-  const handleSaveSingleRow = async (index) => {
-    const row = previewData[index];
+  const handleApproveWarning = (row) => {
+    const realIdx = previewData.indexOf(row);
+    if(realIdx > -1) {
+      const newData = [...previewData];
+      newData[realIdx].gapApproved = true;
+      newData[realIdx].gapRejected = false;
+      const revalidatedData = revalidateData(newData, students, dbFeeMap);
+      setPreviewData(revalidatedData);
+      if (revalidatedData.filter(d => d.isWarning).length === 0) setActiveTab("valid");
+    }
+  };
+
+  const handleRejectWarning = (row) => {
+    const realIdx = previewData.indexOf(row);
+    if(realIdx > -1) {
+      const newData = [...previewData];
+      newData[realIdx].gapRejected = true;
+      newData[realIdx].gapApproved = false;
+      const revalidatedData = revalidateData(newData, students, dbFeeMap);
+      setPreviewData(revalidatedData);
+      if (revalidatedData.filter(d => d.isWarning).length === 0) setActiveTab("invalid");
+    }
+  };
+
+  const extractDBPayload = (row) => {
+    const { isValid, isWarning, missingList, gapApproved, gapRejected, errorReason, allocatedDetailsArray, logicMatched, dbPaidMonths, monthlyRate, examFee, isManualOverride, ...payload } = row;
+    return payload;
+  };
+
+  const handleSaveSingleRow = async (realIdx) => {
+    const row = previewData[realIdx];
     if (!row.isValid) return toast.error("Cannot save invalid record.");
     
     setIsSaving(true);
     try {
-      const { isValid, errorReason, studentName, class: stdClass, roll, phone, allocatedDetailsArray, logicMatched, monthlyRate, examFee, ...payload } = row;
+      const payload = extractDBPayload(row);
       await saveStudentFee(payload);
       toast.success(`Record for ${row.studentName} saved to DB!`);
       
       const newData = [...previewData];
-      newData.splice(index, 1);
-      setPreviewData(newData);
+      newData.splice(realIdx, 1);
+      
+      const newMap = { ...dbFeeMap };
+      if (!newMap[row.studentId]) newMap[row.studentId] = { paidTuitionMonths: [], history: [], dates: [] };
+      newMap[row.studentId].dates.push(row.invoiceDate);
+      row.selectedMonths.forEach(m => {
+        if (!newMap[row.studentId].paidTuitionMonths.includes(m)) {
+           newMap[row.studentId].paidTuitionMonths.push(m);
+        }
+      });
+      setDbFeeMap(newMap);
+
+      const updatedData = recalculateAllRows(newData);
+      const revalidatedData = revalidateData(updatedData, students, newMap);
+      setPreviewData(revalidatedData);
+      
       fetchInitialData(); 
     } catch (error) {
       toast.error("Failed to save record.");
@@ -363,13 +581,13 @@ export default function BulkFeeImport() {
 
   const handleSaveToDatabase = async () => {
     const validRows = previewData.filter((row) => row.isValid);
-    if (validRows.length === 0) return;
+    if (validRows.length === 0) return toast.error("No valid records to save.");
 
     setIsSaving(true);
     setUploadProgress(0);
 
     try {
-      const cleanPayloads = validRows.map(({ isValid, errorReason, studentName, class: stdClass, roll, phone, allocatedDetailsArray, logicMatched, monthlyRate, examFee, ...rest }) => rest);
+      const cleanPayloads = validRows.map(row => extractDBPayload(row));
       const CHUNK_SIZE = 50; 
       const totalChunks = Math.ceil(cleanPayloads.length / CHUNK_SIZE);
 
@@ -379,7 +597,7 @@ export default function BulkFeeImport() {
         setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
       }
 
-      toast.success(`Successfully saved ${validRows.length} records.`);
+      toast.success(`Successfully saved ${validRows.length} records to Database!`);
       setPreviewData((prev) => prev.filter((row) => !row.isValid));
       setIsSaving(false);
       setUploadProgress(0);
@@ -391,15 +609,16 @@ export default function BulkFeeImport() {
     }
   };
 
-  // ONLY CLEARS THE DB, DOES NOT SAVE NEW ONES
   const handleClearDatabase = async () => {
-    if (!window.confirm("⚠️ সতর্কতা! আপনি কি নিশ্চিত?\n\nডাটাবেসের সকল ফি রেকর্ড সম্পূর্ণ মুছে যাবে। নতুন কোনো রেকর্ড সেভ হবে না।")) return;
+    if (!window.confirm("⚠️ সতর্কতা! আপনি কি নিশ্চিত?\n\nডাটাবেসের সকল ফি রেকর্ড সম্পূর্ণ মুছে যাবে। নতুন কোনো রেকর্ড সেভ হবে না। এটি আর ফেরত পাওয়া যাবে না।")) return;
 
     setIsSaving(true);
     try {
       await deleteAllFees();
       toast.success(`ডাটাবেসের সকল ফি রেকর্ড মুছে ফেলা হয়েছে।`);
       fetchInitialData(); 
+      const updatedData = recalculateAllRows(previewData);
+      setPreviewData(revalidateData(updatedData, students, {}));
     } catch (error) {
       toast.error("Failed to clear Database.");
     } finally {
@@ -408,19 +627,18 @@ export default function BulkFeeImport() {
   };
 
   const exportInvalidData = () => {
-    const invalidData = previewData
-      .filter((d) => !d.isValid)
-      .map((d) => ({
-        "STUDENT ID": d.studentId,
-        "NAME": d.studentName || "Unknown",
-        "DATE": d.invoiceDate,
-        "AMOUNT (TK)": d.grandTotal,
-        "ERROR REASON": d.errorReason,
-      }));
+    const invalidDataRows = previewData.filter(d => !d.isValid && !d.isWarning);
+    if (invalidDataRows.length === 0) return toast.error("কোনো ইনভ্যালিড ডেটা নেই!");
 
-    if (invalidData.length === 0) return toast.error("কোনো ইনভ্যালিড ডেটা নেই!");
+    const formattedData = invalidDataRows.map((d) => ({
+      "STUDENT ID": d.studentId,
+      "NAME": d.studentName || "Unknown",
+      "DATE": d.invoiceDate,
+      "AMOUNT (TK)": d.grandTotal,
+      "ERROR REASON": d.errorReason,
+    }));
     
-    const ws = XLSX.utils.json_to_sheet(invalidData);
+    const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Invalid Data");
     XLSX.writeFile(wb, "Invalid_Fee_Records.xlsx");
@@ -436,16 +654,35 @@ export default function BulkFeeImport() {
 
   const handleSaveHistoryEdit = async (recordId) => {
     try {
-      const newAmount = Number(editHistoryForm.amount);
-      const allocation = allocateMonthsAndFees(historyStudent.id, editHistoryForm.invoiceDate, newAmount, true);
+      const newAmount = parseAmount(editHistoryForm.amount);
+      const { monthlyRate, examFee, tuitionTotal } = deduceFeeBreakdown(newAmount);
+
+      const existingRecord = historyRecords.find(r => r.id === recordId);
+      const newMonths = existingRecord.selectedMonths || [];
+
+      let newFeeDetails = {};
+      if (tuitionTotal > 0) newFeeDetails["Tuition fee"] = tuitionTotal;
+      if (examFee > 0) newFeeDetails["Exam fee"] = examFee;
+
+      let newMonthWise = {};
+      newMonths.forEach((m, idx) => {
+        newMonthWise[m] = { checked: {}, amounts: {} };
+        if (monthlyRate > 0) {
+          newMonthWise[m].checked["Tuition fee"] = true;
+          newMonthWise[m].amounts["Tuition fee"] = monthlyRate;
+        }
+        if (examFee > 0 && idx === newMonths.length - 1) {
+          newMonthWise[m].checked["Exam fee"] = true;
+          newMonthWise[m].amounts["Exam fee"] = examFee;
+        }
+      });
 
       const updatedPayload = {
         invoiceDate: editHistoryForm.invoiceDate,
         memoNo: editHistoryForm.memoNo,
         grandTotal: newAmount,
-        feeDetails: allocation.feeDetails,
-        monthWiseDetails: allocation.monthWiseDetails,
-        selectedMonths: allocation.selectedMonths
+        feeDetails: newFeeDetails,
+        monthWiseDetails: newMonthWise
       };
 
       await updateStudentFee(recordId, updatedPayload);
@@ -470,34 +707,42 @@ export default function BulkFeeImport() {
     }
   };
 
-  const validData = previewData.filter(d => d.isValid);
-  const invalidData = previewData.filter(d => !d.isValid);
+  // --- FILTERING (Search Bar) ---
+  const filteredPreviewData = previewData.filter(d => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    return (
+      String(d.studentId).toLowerCase().includes(s) ||
+      (d.studentName && d.studentName.toLowerCase().includes(s)) ||
+      (d.invoiceDate && d.invoiceDate.includes(s)) ||
+      (d.memoNo && d.memoNo.toLowerCase().includes(s))
+    );
+  });
 
-  // --- SUMMARY CALCULATIONS ---
+  const validData = filteredPreviewData.filter(d => d.isValid);
+  const warningData = filteredPreviewData.filter(d => d.isWarning);
+  const invalidData = filteredPreviewData.filter(d => !d.isValid && !d.isWarning);
+
   const summaryByClass = {};
   const summaryByMonth = {};
   let grandTuition = 0;
   let grandExam = 0;
-  let grandOther = 0;
 
   validData.forEach(row => {
      const c = row.class || "Unknown";
-     if(!summaryByClass[c]) summaryByClass[c] = { tuition: 0, exam: 0, other: 0, total: 0, count: 0 };
+     if(!summaryByClass[c]) summaryByClass[c] = { tuition: 0, exam: 0, total: 0, count: 0 };
      
      summaryByClass[c].count += 1;
      summaryByClass[c].total += row.grandTotal;
      
      let tuition = row.feeDetails["Tuition fee"] || 0;
      let exam = row.feeDetails["Exam fee"] || 0;
-     let other = row.grandTotal - tuition - exam;
      
      summaryByClass[c].tuition += tuition;
      summaryByClass[c].exam += exam;
-     summaryByClass[c].other += other;
      
      grandTuition += tuition;
      grandExam += exam;
-     grandOther += other;
      
      row.allocatedDetailsArray.forEach(m => {
         if(!summaryByMonth[m.month]) summaryByMonth[m.month] = { tuition: 0, exam: 0, total: 0 };
@@ -513,14 +758,13 @@ export default function BulkFeeImport() {
   return (
     <div className="animate-in fade-in duration-300 max-w-[100rem] mx-auto space-y-6">
       
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center">
-            <UploadCloud className="w-6 h-6 mr-2 text-blue-600" /> Smart Fee Analyzer
+            <UploadCloud className="w-6 h-6 mr-2 text-blue-600" /> Smart Fee Analyzer (Staging Preview)
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Date, Particulars (ID), Credit (Amount) কলামযুক্ত এক্সেল শিট আপলোড করুন।
+            ফাইল আপলোড করে টেম্পোরারি রিভিউ করুন, এডিট করুন এবং পরবর্তীতে ডাটাবেসে সেভ করুন।
           </p>
         </div>
 
@@ -533,7 +777,7 @@ export default function BulkFeeImport() {
             onClick={() => fileInputRef.current?.click()}
             className="shadow-lg shadow-blue-500/20"
           >
-            {isUploading ? "Processing Excel..." : "Upload Excel File"}
+            {isUploading ? "Processing Excel..." : "Upload & Preview Excel"}
           </Button>
         </div>
       </div>
@@ -555,15 +799,12 @@ export default function BulkFeeImport() {
           </div>
         </div>
 
-        <div className="bg-blue-50 dark:bg-blue-900/10 p-6 rounded-2xl border border-blue-200 dark:border-blue-800/50">
+        <div className="bg-blue-50 dark:bg-blue-900/10 p-6 rounded-2xl border border-blue-200 dark:border-blue-800/50 flex flex-col justify-center">
           <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-            <Info className="w-4 h-4" /> Import Format Note
+            <Info className="w-4 h-4" /> Staging Note
           </h3>
           <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-            Excel sheet must contain these exact column names:<br/>
-            <strong className="text-slate-800 dark:text-slate-200">Date</strong> (e.g. 2/8/2026)<br/>
-            <strong className="text-slate-800 dark:text-slate-200">Particulars</strong> (Student ID)<br/>
-            <strong className="text-slate-800 dark:text-slate-200">Credit</strong> (Amount Paid)
+            Uploaded data stays in local temporary view. Review, edit rows, and when ready, click <b>Save All to Database</b>.
           </p>
         </div>
       </div>
@@ -571,7 +812,7 @@ export default function BulkFeeImport() {
       {isSaving && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in zoom-in-95">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold text-slate-800 dark:text-white">Processing Action...</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-white">Processing Database Action...</h3>
             <span className="font-bold text-blue-600">{uploadProgress}%</span>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
@@ -583,36 +824,43 @@ export default function BulkFeeImport() {
       {previewData.length > 0 && !isSaving && (
         <Card>
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-0">
-             <div className="flex flex-wrap items-center justify-between p-4 gap-4">
-                <div className="flex gap-2">
+             <div className="flex flex-col lg:flex-row lg:items-center justify-between p-4 gap-4">
+                <div className="flex flex-wrap gap-2">
                   <button onClick={() => setActiveTab("valid")} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'valid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                    Valid Data ({validData.length})
+                    Valid Preview ({validData.length})
+                  </button>
+                  <button onClick={() => setActiveTab("warning")} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} ${warningData.length > 0 ? 'animate-pulse' : ''}`}>
+                    Warnings ({warningData.length})
                   </button>
                   <button onClick={() => setActiveTab("invalid")} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'invalid' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                    Invalid Data ({invalidData.length})
+                    Invalid Preview ({invalidData.length})
                   </button>
                   <button onClick={() => setActiveTab("summary")} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'summary' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                     Class Summary & Report
                   </button>
                 </div>
                 
+                <div className="flex gap-2 w-full lg:w-72">
+                  <Input 
+                    placeholder="Search ID, Name, Date..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    leftIcon={<Search className="w-4 h-4 text-slate-400" />}
+                  />
+                </div>
+             </div>
+             
+             <div className="flex justify-end gap-2 px-4 pb-4">
                 {activeTab === 'valid' && validData.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button onClick={handleSaveToDatabase} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"><Database className="w-4 h-4 mr-2"/> Save All Valid</Button>
-                    <Button onClick={handleClearDatabase} className="bg-red-600 hover:bg-red-700 text-white shadow-lg" title="Deletes all old DB fees (Does not save new ones)"><Trash2 className="w-4 h-4 mr-2"/> Clear DB Only</Button>
-                  </div>
+                  <>
+                    <Button onClick={handleSaveToDatabase} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"><Database className="w-4 h-4 mr-2"/> Save All to Database</Button>
+                    <Button onClick={handleClearDatabase} className="bg-red-600 hover:bg-red-700 text-white shadow-lg" title="Deletes all old DB fees"><Trash2 className="w-4 h-4 mr-2"/> Clear DB Only</Button>
+                  </>
                 )}
-
                 {activeTab === 'invalid' && invalidData.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={exportInvalidData} 
-                      className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white"
-                      leftIcon={<Download className="w-4 h-4" />}
-                    >
-                      Download Invalid (.xlsx)
-                    </Button>
-                  </div>
+                  <Button onClick={exportInvalidData} className="bg-slate-800 hover:bg-slate-900 text-white" leftIcon={<Download className="w-4 h-4" />}>
+                    Download Invalid (.xlsx)
+                  </Button>
                 )}
              </div>
           </CardHeader>
@@ -626,25 +874,29 @@ export default function BulkFeeImport() {
                     <TableRow>
                       <TableHead className="w-64">Student Info</TableHead>
                       <TableHead className="w-32">DB Record</TableHead>
-                      <TableHead className="w-32">Imported Date</TableHead>
+                      <TableHead className="w-32">Staging Date</TableHead>
                       <TableHead className="w-64">Allocated Months (Analyzed)</TableHead>
+                      <TableHead className="w-24">Rate/Mo.</TableHead>
                       <TableHead className="w-48 text-right">Total & Breakdown</TableHead>
                       <TableHead className="w-32 text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {validData.map((row, index) => (
-                      <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                    {validData.length === 0 && <TableRow><TableCell colSpan="7" className="text-center py-10 font-bold text-slate-500">No valid staging records to display.</TableCell></TableRow>}
+                    {validData.map((row) => {
+                      const realIdx = previewData.indexOf(row);
+                      return (
+                      <TableRow key={realIdx} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                         
                         <TableCell>
                           <div 
-                            className="flex items-start gap-3 cursor-pointer group"
+                            className="flex items-start gap-3 cursor-pointer group-hover"
                             onClick={() => { setSelectedStudentInfo(row); setShowStudentModal(true); }}
                             title="Click for Details"
                           >
                             <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors"><User className="w-4 h-4"/></div>
                             <div>
-                              {editingIndex === index ? (
+                              {editingIndex === realIdx ? (
                                 <Input value={editForm.studentId} onChange={(e) => setEditForm({ ...editForm, studentId: e.target.value })} className="h-7 text-xs w-20" onClick={e=>e.stopPropagation()}/>
                               ) : (
                                 <p className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">{row.studentId}</p>
@@ -665,30 +917,44 @@ export default function BulkFeeImport() {
                         </TableCell>
 
                         <TableCell>
-                          {editingIndex === index ? (
-                            <Input type="date" value={editForm.invoiceDate} onChange={(e) => setEditForm({ ...editForm, invoiceDate: e.target.value })} className="h-7 text-xs w-28" />
+                          {editingIndex === realIdx ? (
+                            <div className="flex flex-col gap-1">
+                               <Input type="date" value={editForm.invoiceDate} onChange={(e) => setEditForm({ ...editForm, invoiceDate: e.target.value })} className="h-7 text-xs w-28" />
+                               <Input value={editForm.memoNo} onChange={(e) => setEditForm({ ...editForm, memoNo: e.target.value })} className="h-7 text-[10px] w-28" placeholder="Memo"/>
+                            </div>
                           ) : (
-                            <span className="font-medium text-slate-700 dark:text-slate-300">{row.invoiceDate}</span>
+                            <>
+                              <span className="block font-medium text-slate-700 dark:text-slate-300">{row.invoiceDate}</span>
+                              <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{row.memoNo}</span>
+                            </>
                           )}
                         </TableCell>
 
                         <TableCell>
-                          <div className="flex flex-col gap-1.5">
-                            {row.allocatedDetailsArray.map((m, i) => (
-                              <div key={i} className="flex items-center gap-2">
-                                <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase w-12 text-center">
-                                  {m.month.slice(0,3)}
-                                </span>
-                                <span className="text-[10px] text-slate-500 font-medium">
-                                  Tuition: {m.tuition} {m.exam > 0 && <span className="text-orange-500 ml-1">+ Exam: {m.exam}</span>}
-                                </span>
+                           {editingIndex === realIdx ? (
+                              <Input value={editForm.months} onChange={(e) => setEditForm({ ...editForm, months: e.target.value })} className="h-7 text-xs w-full" placeholder="e.g. Jan, Feb" />
+                           ) : (
+                              <div className="flex flex-col gap-1.5">
+                                {row.allocatedDetailsArray.map((m, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase w-12 text-center">
+                                      {m.month.slice(0,3)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      Tuition: {m.tuition} {m.exam > 0 && <span className="text-orange-500 ml-1">+ Exam: {m.exam}</span>}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                           )}
+                        </TableCell>
+
+                        <TableCell>
+                          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded">৳{row.monthlyRate}</span>
                         </TableCell>
 
                         <TableCell className="text-right">
-                          {editingIndex === index ? (
+                          {editingIndex === realIdx ? (
                             <Input type="number" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} className="h-7 text-xs w-20 ml-auto" />
                           ) : (
                             <div className="flex flex-col items-end">
@@ -703,20 +969,20 @@ export default function BulkFeeImport() {
                         </TableCell>
 
                         <TableCell className="text-center">
-                          {editingIndex === index ? (
+                          {editingIndex === realIdx ? (
                             <div className="flex justify-center gap-1.5">
-                              <button onClick={() => saveEdit(index)} className="p-1.5 bg-emerald-100 text-emerald-600 rounded"><Check className="w-4 h-4" /></button>
+                              <button onClick={() => saveEdit(realIdx)} className="p-1.5 bg-emerald-100 text-emerald-600 rounded"><Check className="w-4 h-4" /></button>
                               <button onClick={() => setEditingIndex(null)} className="p-1.5 bg-slate-100 text-slate-600 rounded"><X className="w-4 h-4" /></button>
                             </div>
                           ) : (
-                            <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => handleSaveSingleRow(index)} className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 rounded transition-colors" title="Save Row">
+                            <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <button onClick={() => handleSaveSingleRow(realIdx)} className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 rounded transition-colors" title="Save Row to DB">
                                 <Save className="w-4 h-4" />
                               </button>
-                              <button onClick={() => { setEditingIndex(index); setEditForm({ studentId: row.studentId, amount: row.grandTotal, invoiceDate: row.invoiceDate }); }} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 rounded transition-colors">
+                              <button onClick={() => { setEditingIndex(realIdx); setEditForm({ studentId: row.studentId, amount: row.grandTotal, invoiceDate: row.invoiceDate, memoNo: row.memoNo, months: row.selectedMonths.join(", ") }); }} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 rounded transition-colors" title="Edit Row">
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleDeleteRow(index)} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 rounded transition-colors">
+                              <button onClick={() => handleDeleteRow(realIdx)} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 rounded transition-colors" title="Delete Row">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -724,9 +990,89 @@ export default function BulkFeeImport() {
                         </TableCell>
 
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {/* WARNING DATA TAB */}
+            {activeTab === "warning" && (
+              <div className="overflow-x-auto max-h-[600px] custom-scrollbar p-4">
+                {warningData.length === 0 ? (
+                  <p className="text-center text-emerald-500 py-10 font-bold">No Warnings! All good. ✅</p>
+                ) : (
+                  <div className="space-y-4">
+                     <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 p-4 rounded-xl flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5"/>
+                        <div>
+                          <h4 className="font-bold text-yellow-800 dark:text-yellow-400">Missing Months Detected</h4>
+                          <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 leading-relaxed">
+                            These students have skipped one or more months. If they paid late or skipped intentionally, click <b>Approve</b>. If this is an error, click <b>Reject</b> to move them to the Invalid list.
+                          </p>
+                        </div>
+                     </div>
+                     <Table>
+                       <TableHeader className="bg-yellow-100/50 dark:bg-yellow-900/10">
+                         <TableRow>
+                           <TableHead>Status</TableHead>
+                           <TableHead>Student Info</TableHead>
+                           <TableHead>Import Date</TableHead>
+                           <TableHead>Allocated Months</TableHead>
+                           <TableHead className="text-right">Sheet Amount</TableHead>
+                           <TableHead className="text-center">Action</TableHead>
+                         </TableRow>
+                       </TableHeader>
+                       <TableBody>
+                         {warningData.map(row => {
+                           const realIdx = previewData.indexOf(row);
+                           return (
+                           <TableRow key={realIdx} className="group bg-yellow-50/30 dark:bg-yellow-900/5 hover:bg-yellow-50 dark:hover:bg-yellow-900/10 transition-colors">
+                             <TableCell>
+                                <Badge variant="warning" className="bg-yellow-200 text-yellow-800 border-yellow-300">
+                                  Gap Detected
+                                </Badge>
+                                <p className="text-[10px] text-yellow-600 mt-1 font-bold">Missing: {row.missingList?.join(", ")}</p>
+                             </TableCell>
+                             <TableCell>
+                                <p className="font-bold text-slate-800 dark:text-slate-200">{row.studentId}</p>
+                                <p className="text-[10px] text-slate-500">{row.studentName} ({row.class})</p>
+                             </TableCell>
+                             <TableCell>
+                               {editingIndex === realIdx ? <Input type="date" value={editForm.invoiceDate} onChange={e=>setEditForm({...editForm, invoiceDate: e.target.value})} className="h-7 text-xs w-28"/> : <span className="text-xs font-medium">{row.invoiceDate}</span>}
+                             </TableCell>
+                             <TableCell>
+                               {editingIndex === realIdx ? (
+                                  <Input value={editForm.months} onChange={(e) => setEditForm({ ...editForm, months: e.target.value })} className="h-7 text-xs w-full" placeholder="e.g. Jan, Feb" />
+                               ) : (
+                                 <div className="flex flex-wrap gap-1">
+                                   {row.selectedMonths.map(m=><span key={m} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">{m.slice(0,3)}</span>)}
+                                 </div>
+                               )}
+                             </TableCell>
+                             <TableCell className="text-right">
+                               {editingIndex === realIdx ? <Input type="number" value={editForm.amount} onChange={e=>setEditForm({...editForm, amount: e.target.value})} className="h-7 text-xs w-20 ml-auto"/> : <span className="font-bold text-slate-800 dark:text-white">৳ {row.grandTotal}</span>}
+                             </TableCell>
+                             <TableCell className="text-center">
+                               {editingIndex === realIdx ? (
+                                <div className="flex justify-center gap-1.5">
+                                  <button onClick={() => saveEdit(realIdx)} className="p-1.5 bg-emerald-100 text-emerald-600 rounded"><Check className="w-4 h-4" /></button>
+                                  <button onClick={() => setEditingIndex(null)} className="p-1.5 bg-slate-100 text-slate-600 rounded"><X className="w-4 h-4" /></button>
+                                </div>
+                               ) : (
+                                <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <button onClick={() => handleApproveWarning(row)} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold text-xs rounded hover:bg-emerald-200" title="Approve Gap & Move to Valid">Approve</button>
+                                  <button onClick={() => handleRejectWarning(row)} className="px-3 py-1.5 bg-red-100 text-red-700 font-bold text-xs rounded hover:bg-red-200" title="Reject & Move to Invalid">Reject</button>
+                                  <button onClick={() => { setEditingIndex(realIdx); setEditForm({ studentId: row.studentId, amount: row.grandTotal, invoiceDate: row.invoiceDate, memoNo: row.memoNo, months: row.selectedMonths.join(", ") }); }} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                </div>
+                               )}
+                             </TableCell>
+                           </TableRow>
+                         )})}
+                       </TableBody>
+                     </Table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -737,8 +1083,10 @@ export default function BulkFeeImport() {
                   <p className="text-center text-slate-500 py-10 font-bold">No Invalid Records! 🎉</p>
                 ) : (
                   <div className="space-y-3">
-                    {invalidData.map((row, idx) => (
-                      <div key={idx} className="bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    {invalidData.map((row) => {
+                      const realIdx = previewData.indexOf(row);
+                      return (
+                      <div key={realIdx} className="group bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-center justify-between hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                         <div className="flex gap-4 items-center w-full">
                           <AlertTriangle className="w-6 h-6 text-red-500 shrink-0"/>
                           <div>
@@ -750,15 +1098,13 @@ export default function BulkFeeImport() {
                             </p>
                           </div>
                         </div>
-                        <button onClick={() => {
-                          const nd = [...previewData];
-                          const realIdx = nd.findIndex(x => x === row);
-                          if(realIdx > -1) handleDeleteRow(realIdx);
-                        }} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg shrink-0">
-                          <Trash2 className="w-5 h-5"/>
-                        </button>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
+                           <button onClick={() => handleDeleteRow(realIdx)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg shrink-0">
+                             <Trash2 className="w-5 h-5"/>
+                           </button>
+                        </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>
@@ -767,29 +1113,55 @@ export default function BulkFeeImport() {
             {/* SUMMARY TAB */}
             {activeTab === "summary" && (
               <div className="p-6 bg-slate-50 dark:bg-slate-900/50 min-h-[400px]">
-                <div className="flex justify-between items-center mb-6 no-print border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 dark:border-slate-800 pb-4 gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">Batch Analysis & Summary</h2>
-                    <p className="text-sm text-slate-500">Overview of valid records before saving.</p>
+                    <p className="text-sm text-slate-500">Download high-quality PDF reports.</p>
                   </div>
-                  <Button onClick={() => window.print()} leftIcon={<Printer className="w-4 h-4"/>}>Print Summary PDF</Button>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    <PDFDownloadLink
+                      document={
+                        <FeeSummaryReportTemplate 
+                          mode="full"
+                          validData={validData} 
+                          classSummary={sortedClassSummary} 
+                          monthSummary={sortedMonthSummary} 
+                          totals={{ validCount: validData.length, grandTotal: validData.reduce((a,c)=>a+c.grandTotal,0), tuition: grandTuition, exam: grandExam }}
+                        />
+                      }
+                      fileName={`Fee_Full_Report_${new Date().toISOString().split('T')[0]}.pdf`}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center shadow-lg"
+                    >
+                      {({ loading }) => (loading ? "Generating PDF..." : <><Download className="w-4 h-4 mr-2"/> Download Full PDF</>)}
+                    </PDFDownloadLink>
+
+                    <PDFDownloadLink
+                      document={
+                        <FeeSummaryReportTemplate 
+                          mode="students"
+                          validData={validData} 
+                          classSummary={[]} 
+                          monthSummary={[]} 
+                          totals={{ validCount: validData.length, grandTotal: validData.reduce((a,c)=>a+c.grandTotal,0), tuition: 0, exam: 0 }}
+                        />
+                      }
+                      fileName={`Fee_Student_List_${new Date().toISOString().split('T')[0]}.pdf`}
+                      className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center"
+                    >
+                      {({ loading }) => (loading ? "Generating PDF..." : <><Printer className="w-4 h-4 mr-2"/> Download Student Sheet</>)}
+                    </PDFDownloadLink>
+                  </div>
                 </div>
                 
-                <div id="print-area" className="print-area bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm">
-                   
-                   <div className="text-center mb-6 pb-6 border-b-2 border-slate-800 dark:border-slate-600 hidden print:block">
-                     <h2 className="text-2xl font-black text-black uppercase tracking-wider font-serif">Western School and College</h2>
-                     <h3 className="text-lg font-bold text-slate-700 mt-1">FEE BATCH SUMMARY REPORT</h3>
-                     <p className="text-slate-500 font-medium mt-1">Date: {new Date().toLocaleDateString('en-GB')}</p>
-                   </div>
-                   
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                      <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
-                        <p className="text-xs font-bold text-indigo-500 uppercase">Valid Records</p>
+                        <p className="text-xs font-bold text-indigo-500 uppercase">Valid Preview</p>
                         <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400">{validData.length}</p>
                      </div>
                      <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/50">
-                        <p className="text-xs font-bold text-emerald-500 uppercase">Total Expected Earn</p>
+                        <p className="text-xs font-bold text-emerald-500 uppercase">Total Staging Earn</p>
                         <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400">৳{validData.reduce((a,c)=>a+c.grandTotal,0).toLocaleString()}</p>
                      </div>
                      <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
@@ -801,86 +1173,9 @@ export default function BulkFeeImport() {
                         <p className="text-2xl font-black text-orange-700 dark:text-orange-400">৳{grandExam.toLocaleString()}</p>
                      </div>
                    </div>
-
-                   <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">1. Class-wise Earnings</h3>
-                   <div className="overflow-x-auto mb-8">
-                     <table className="w-full text-left text-sm border-collapse border border-slate-300">
-                       <thead className="bg-slate-100 dark:bg-slate-700">
-                         <tr>
-                           <th className="p-2 border border-slate-300">Class</th>
-                           <th className="p-2 border border-slate-300 text-center">Students</th>
-                           <th className="p-2 border border-slate-300 text-right">Tuition Fee</th>
-                           <th className="p-2 border border-slate-300 text-right">Exam Fee</th>
-                           <th className="p-2 border border-slate-300 text-right font-bold">Total Amount</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {sortedClassSummary.map((c, i) => (
-                           <tr key={i}>
-                             <td className="p-2 border border-slate-300 font-bold">{c.className}</td>
-                             <td className="p-2 border border-slate-300 text-center">{c.count}</td>
-                             <td className="p-2 border border-slate-300 text-right">৳{c.tuition}</td>
-                             <td className="p-2 border border-slate-300 text-right">৳{c.exam}</td>
-                             <td className="p-2 border border-slate-300 text-right font-bold">৳{c.total}</td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-
-                   <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">2. Month-wise Allocation</h3>
-                   <div className="overflow-x-auto mb-8">
-                     <table className="w-full text-left text-sm border-collapse border border-slate-300">
-                       <thead className="bg-slate-100 dark:bg-slate-700">
-                         <tr>
-                           <th className="p-2 border border-slate-300">Month</th>
-                           <th className="p-2 border border-slate-300 text-right">Tuition Earned</th>
-                           <th className="p-2 border border-slate-300 text-right">Exam Fee Earned</th>
-                           <th className="p-2 border border-slate-300 text-right font-bold">Total</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {sortedMonthSummary.map((m, i) => (
-                           <tr key={i}>
-                             <td className="p-2 border border-slate-300 font-bold">{m.monthName}</td>
-                             <td className="p-2 border border-slate-300 text-right">৳{m.tuition}</td>
-                             <td className="p-2 border border-slate-300 text-right">৳{m.exam}</td>
-                             <td className="p-2 border border-slate-300 text-right font-bold">৳{m.total}</td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-
-                   <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">3. Student Detailed List</h3>
-                   <div className="overflow-x-auto">
-                     <table className="w-full text-left text-sm border-collapse border border-slate-300 text-black dark:text-white">
-                       <thead className="bg-slate-100 dark:bg-slate-700">
-                         <tr>
-                           <th className="p-2 border border-slate-300">ID</th>
-                           <th className="p-2 border border-slate-300">Name & Class</th>
-                           <th className="p-2 border border-slate-300">Allocated Months</th>
-                           <th className="p-2 border border-slate-300">Fee Breakdown</th>
-                           <th className="p-2 border border-slate-300 text-right font-bold">Total</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {validData.map((row, i) => (
-                           <tr key={i}>
-                             <td className="p-2 border border-slate-300 font-bold">{row.studentId}</td>
-                             <td className="p-2 border border-slate-300">{row.studentName} <br/><span className="text-[10px] text-slate-500">{row.class}</span></td>
-                             <td className="p-2 border border-slate-300 text-xs font-medium">{row.selectedMonths.join(", ")}</td>
-                             <td className="p-2 border border-slate-300 text-xs">
-                               {Object.entries(row.feeDetails).map(([k, v]) => (
-                                  <span key={k} className="mr-2">{k}: ৳{v}</span>
-                               ))}
-                             </td>
-                             <td className="p-2 border border-slate-300 text-right font-bold">৳{row.grandTotal}</td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
+                   <p className="text-center text-slate-500 font-medium">
+                     Please click the buttons above to download the high-quality PDF reports.
+                   </p>
                 </div>
               </div>
             )}
@@ -988,14 +1283,6 @@ export default function BulkFeeImport() {
         </div>
       )}
 
-      {/* Print Styles */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; padding: 0 !important; }
-        }
-      `}</style>
     </div>
   );
 }
