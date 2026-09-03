@@ -4,31 +4,47 @@ import { db } from "@/config/firebase";
 // --- TEACHER CRUD ---
 export const getTeachers = async () => {
   const snapshot = await getDocs(collection(db, "teachers"));
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  let teachers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // GHOST ACCOUNT FIX: ডাটাবেসে থাকা সকল ফাঁকা/ইনভ্যালিড অ্যাকাউন্ট ফিল্টার করে বাদ দেওয়া হচ্ছে
+  teachers = teachers.filter(t => t.teacherId && t.englishName);
+
+  // AUTO ID-WISE SORTING LOGIC: 
+  // 1000+ আইডিগুলো আগে বসবে, ২ ডিজিটের (১০০ এর ছোট) আইডিগুলো শেষে যাবে।
+  return teachers.sort((a, b) => {
+    const idA = parseInt(a.teacherId) || 0;
+    const idB = parseInt(b.teacherId) || 0;
+
+    // চেক করা হচ্ছে আইডি ২ ডিজিটের (১০০ এর ছোট) কি না
+    const isSmallA = idA < 100;
+    const isSmallB = idB < 100;
+
+    if (isSmallA && !isSmallB) return 1;  // A ছোট আইডি হলে তাকে শেষে পাঠাও
+    if (!isSmallA && isSmallB) return -1; // B ছোট আইডি হলে তাকে শেষে পাঠাও
+
+    // বাকি সব ক্ষেত্রে নরমাল সিরিয়াল (ছোট থেকে বড়)
+    return idA - idB; 
+  });
 };
 
 export const saveTeacher = async (teacherData, originalId = null) => {
   const newId = String(teacherData.teacherId);
   const newDocRef = doc(db, "teachers", newId); 
   
-  // Data clean-up before saving
   const dataToSave = { ...teacherData };
   delete dataToSave.originalId;
   delete dataToSave.id; 
 
-  // If editing and ID has been changed, migrate the old data
   if (originalId && String(originalId) !== newId) {
     const batch = writeBatch(db);
     
-    // 1. Set new Teacher Document
     batch.set(newDocRef, { ...dataToSave, updatedAt: new Date().toISOString() });
     
-    // 2. Delete old Teacher Document
     const oldDocRef = doc(db, "teachers", String(originalId));
     batch.delete(oldDocRef);
     
-    // 3. Migrate Salary Records to the new ID
-    const salaryQ = query(collection(db, "teacherSalaries"), where("teacherId", "==", String(originalId)));
+    // Migrate Salary
+    const salaryQ = query(collection(db, "teacherSalaries"), where("teacherId", "in", [String(originalId), Number(originalId)]));
     const salarySnap = await getDocs(salaryQ);
     salarySnap.docs.forEach((docSnap) => {
       const data = docSnap.data();
@@ -37,8 +53,8 @@ export const saveTeacher = async (teacherData, originalId = null) => {
       batch.delete(docSnap.ref);
     });
 
-    // 4. Migrate Attendance Records to the new ID
-    const attQ = query(collection(db, "teacherAttendance"), where("teacherId", "==", String(originalId)));
+    // Migrate Attendance
+    const attQ = query(collection(db, "teacherAttendance"), where("teacherId", "in", [String(originalId), Number(originalId)]));
     const attSnap = await getDocs(attQ);
     attSnap.docs.forEach((docSnap) => {
       const data = docSnap.data();
@@ -47,10 +63,8 @@ export const saveTeacher = async (teacherData, originalId = null) => {
       batch.delete(docSnap.ref);
     });
 
-    // Execute all changes at once
     await batch.commit();
   } else {
-    // Normal save or update (ID wasn't changed)
     await setDoc(newDocRef, { ...dataToSave, updatedAt: new Date().toISOString() }, { merge: true });
   }
 };
@@ -59,8 +73,20 @@ export const updateTeacher = async (id, data) => {
   await updateDoc(doc(db, "teachers", String(id)), data);
 };
 
+// --- CASCADE DELETE: Teacher + Salaries + Attendance ---
 export const deleteTeacher = async (id) => {
-  await deleteDoc(doc(db, "teachers", String(id)));
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "teachers", String(id)));
+  
+  const salaryQ = query(collection(db, "teacherSalaries"), where("teacherId", "in", [String(id), Number(id)]));
+  const salarySnap = await getDocs(salaryQ);
+  salarySnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+  
+  const attQ = query(collection(db, "teacherAttendance"), where("teacherId", "in", [String(id), Number(id)]));
+  const attSnap = await getDocs(attQ);
+  attSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+  
+  await batch.commit();
 };
 
 // --- ATTENDANCE ---
@@ -81,15 +107,20 @@ export const getAttendanceByDate = async (date) => {
 
 // --- TEACHER DETAILS & SALARY LOGIC ---
 export const getTeacherAttendance = async (teacherId) => {
-  const q = query(collection(db, "teacherAttendance"), where("teacherId", "==", String(teacherId)));
+  const q = query(collection(db, "teacherAttendance"), where("teacherId", "in", [String(teacherId), Number(teacherId)]));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data());
 };
 
 export const getTeacherSalaries = async (teacherId) => {
-  const q = query(collection(db, "teacherSalaries"), where("teacherId", "==", String(teacherId)));
+  const q = query(collection(db, "teacherSalaries"), where("teacherId", "in", [String(teacherId), Number(teacherId)]));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data());
+};
+
+export const getAllSalaries = async () => {
+  const snapshot = await getDocs(collection(db, "teacherSalaries"));
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
 export const payTeacherSalary = async (salaryData) => {
@@ -100,15 +131,23 @@ export const payTeacherSalary = async (salaryData) => {
 export const getSalariesByMonth = async (month) => {
   const q = query(collection(db, "teacherSalaries"), where("month", "==", month));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data());
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
 export const deleteTeacherSalary = async (month, teacherId) => {
   await deleteDoc(doc(db, "teacherSalaries", `${month}_${teacherId}`));
 };
 
+export const deleteSalaryRecordById = async (docId) => {
+  await deleteDoc(doc(db, "teacherSalaries", docId));
+};
+
 export const updateTeacherSalaryRecord = async (month, teacherId, updatedData) => {
   await updateDoc(doc(db, "teacherSalaries", `${month}_${teacherId}`), updatedData);
+};
+
+export const updateSalaryRecordById = async (docId, updatedData) => {
+  await updateDoc(doc(db, "teacherSalaries", docId), updatedData);
 };
 
 export const deleteAllSalariesByMonth = async (month) => {

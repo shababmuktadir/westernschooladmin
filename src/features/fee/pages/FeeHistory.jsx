@@ -1,34 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getStudents } from "@/features/students/services/studentService";
-import { getBulkStudentFees } from "@/features/fee/services/feeService"; 
+import { getBulkStudentFees, updateStudentFee, deleteStudentFee } from "@/features/fee/services/feeService"; 
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown"; 
-import DatePicker from "@/components/ui/DatePicker"; 
+import GlassDatePicker from "@/components/ui/GlassDatePicker"; // নতুন GlassDatePicker ইমপোর্ট করা হলো
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { Search, FileText, Printer, Loader2, Receipt, CalendarCheck, User, X, ChevronRight, Camera } from "lucide-react";
+import { Search, FileText, Printer, Loader2, Receipt, CalendarCheck, User, X, ChevronRight, Edit2, Trash2, Check } from "lucide-react";
+import toast from "react-hot-toast";
 
 // মাসের ক্রমানুসারে সাজানোর জন্য অর্ডার ম্যাপ
 const MONTH_ORDER = {
   "January": 1, "February": 2, "March": 3, "April": 4,
   "May": 5, "June": 6, "July": 7, "August": 8,
   "September": 9, "October": 10, "November": 11, "December": 12
-};
-
-// Custom Native DatePicker
-const CustomDatePicker = ({ label, value, onChange }) => {
-  return (
-    <div className="w-full">
-      {label && <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{label}</label>}
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f172a] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all text-slate-900 dark:text-white dark:[color-scheme:dark]"
-      />
-    </div>
-  );
 };
 
 export default function FeeHistory() {
@@ -43,25 +29,30 @@ export default function FeeHistory() {
 
   const [selectedStudentDetails, setSelectedStudentDetails] = useState(null);
 
+  // Edit States for Modal
+  const [editTxId, setEditTxId] = useState(null);
+  const [editTxForm, setEditTxForm] = useState({ amount: "", invoiceDate: "", memoNo: "" });
+
   const printRef = useRef(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const studentsData = await getStudents();
-        setAllStudents(studentsData.filter(s => s.status !== "Inactive"));
-        
-        const feesData = await getBulkStudentFees(); 
-        setAllFees(feesData);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const studentsData = await getStudents();
+      setAllStudents(studentsData.filter(s => s.status !== "Inactive"));
+      
+      const feesData = await getBulkStudentFees(); 
+      setAllFees(feesData);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const uniqueClasses = useMemo(() => {
     const classes = allStudents.map((s) => s.class).filter(Boolean);
@@ -135,7 +126,18 @@ export default function FeeHistory() {
 
   }, [allFees, allStudents, classFilter, startDate, endDate, searchTerm]);
 
-  // সার্চ করার পর Enter চাপলে সরাসরি ডিটেইলস পপআপ ওপেন হওয়া
+  // Handle Dynamic Closing of Modal if all transactions deleted
+  useEffect(() => {
+    if (selectedStudentDetails) {
+      const exists = filteredAndAggregatedData.find(s => s.studentId === selectedStudentDetails.studentId);
+      if (!exists) setSelectedStudentDetails(null);
+    }
+  }, [filteredAndAggregatedData, selectedStudentDetails]);
+
+  const activeModalStudent = selectedStudentDetails 
+    ? filteredAndAggregatedData.find(s => s.studentId === selectedStudentDetails.studentId) 
+    : null;
+
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && filteredAndAggregatedData.length === 1) {
       setSelectedStudentDetails(filteredAndAggregatedData[0]);
@@ -153,6 +155,47 @@ export default function FeeHistory() {
       return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); 
     }
     return String(dateVal);
+  };
+
+  // --- Modal Edit & Delete Handlers ---
+  const handleEditClick = (tx) => {
+    setEditTxId(tx.id);
+    setEditTxForm({
+      amount: tx.grandTotal,
+      invoiceDate: tx.invoiceDate,
+      memoNo: tx.invoiceNo || tx.memoNo || ""
+    });
+  };
+
+  const handleSaveEdit = async (txId) => {
+    try {
+      const updatedPayload = {
+        grandTotal: Number(editTxForm.amount),
+        invoiceDate: editTxForm.invoiceDate,
+        memoNo: editTxForm.memoNo,
+        invoiceNo: editTxForm.memoNo
+      };
+      
+      await updateStudentFee(txId, updatedPayload);
+      toast.success("Transaction updated successfully!");
+      
+      setAllFees(prev => prev.map(f => f.id === txId ? { ...f, ...updatedPayload } : f));
+      setEditTxId(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update transaction");
+    }
+  };
+
+  const handleDeleteTx = async (txId) => {
+    try {
+      await deleteStudentFee(txId);
+      toast.success("Transaction deleted successfully!");
+      setAllFees(prev => prev.filter(f => f.id !== txId));
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete transaction");
+    }
   };
 
   return (
@@ -212,19 +255,23 @@ export default function FeeHistory() {
                 />
               </div>
 
+              {/* নতুন GlassDatePicker যুক্ত করা হয়েছে */}
               <div className="md:col-span-1 overflow-visible relative z-40">
-                <CustomDatePicker 
+                <GlassDatePicker 
                   label="Start Date"
                   value={startDate}
                   onChange={(val) => setStartDate(val)}
+                  placeholder="Select start date"
                 />
               </div>
 
+              {/* নতুন GlassDatePicker যুক্ত করা হয়েছে */}
               <div className="md:col-span-1 overflow-visible relative z-40">
-                <CustomDatePicker 
+                <GlassDatePicker 
                   label="End Date"
                   value={endDate}
                   onChange={(val) => setEndDate(val)}
+                  placeholder="Select end date"
                 />
               </div>
 
@@ -339,10 +386,10 @@ export default function FeeHistory() {
       </div>
 
       {/* Details Modal / Printable Statement */}
-      {selectedStudentDetails && (
+      {activeModalStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 no-print">
           
-          <div className={`bg-white dark:bg-[#1e293b] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${selectedStudentDetails ? 'print-active' : ''}`}>
+          <div className={`bg-white dark:bg-[#1e293b] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 print-active`}>
             
             {/* Modal Actions Header (Hidden on Print) */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-[#151c2c] no-print">
@@ -373,12 +420,12 @@ export default function FeeHistory() {
               <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 print-border">
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student Name</p>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white print:text-black">{selectedStudentDetails.studentName}</h2>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white print:text-black">{activeModalStudent.studentName}</h2>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student ID & Class</p>
                   <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400 print:text-indigo-800">
-                    ID: {selectedStudentDetails.studentId} <span className="text-slate-400 font-normal mx-1">|</span> {selectedStudentDetails.className}
+                    ID: {activeModalStudent.studentId} <span className="text-slate-400 font-normal mx-1">|</span> {activeModalStudent.className}
                   </p>
                 </div>
               </div>
@@ -387,7 +434,7 @@ export default function FeeHistory() {
                 Transaction History
               </h3>
               
-              <div className="overflow-x-auto print:overflow-visible">
+              <div className="overflow-x-auto print:overflow-visible pb-10">
                 <table className="w-full text-left text-sm border-collapse border border-slate-300 print-border">
                   <thead className="bg-slate-100 dark:bg-slate-800">
                     <tr>
@@ -396,19 +443,27 @@ export default function FeeHistory() {
                       <th className="p-3 border border-slate-300 print-border font-bold">Allocated Months</th>
                       <th className="p-3 border border-slate-300 print-border font-bold">Fee Breakdown</th>
                       <th className="p-3 border border-slate-300 print-border font-bold text-right">Total (৳)</th>
+                      <th className="p-3 border border-slate-300 font-bold text-center no-print w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedStudentDetails.transactions.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate)).map((tx, i) => {
+                    {activeModalStudent.transactions.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate)).map((tx, i) => {
                       const sortedTxMonths = tx.selectedMonths ? [...tx.selectedMonths].sort((a,b) => MONTH_ORDER[a] - MONTH_ORDER[b]) : [];
                       return (
                       <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        
                         <td className="p-3 border border-slate-300 print-border font-medium text-slate-700 dark:text-slate-300">
-                          {formatDisplayDate(tx.invoiceDate)}
+                          {editTxId === tx.id ? (
+                             <input type="date" value={editTxForm.invoiceDate} onChange={e=>setEditTxForm({...editTxForm, invoiceDate: e.target.value})} className="h-8 px-2 text-xs w-full border border-slate-300 rounded dark:bg-slate-800 dark:border-slate-600 outline-none focus:border-blue-500" />
+                          ) : formatDisplayDate(tx.invoiceDate)}
                         </td>
+                        
                         <td className="p-3 border border-slate-300 print-border text-slate-600 dark:text-slate-400 font-mono text-xs">
-                          {tx.invoiceNo || tx.memoNo || "N/A"}
+                          {editTxId === tx.id ? (
+                             <input value={editTxForm.memoNo} onChange={e=>setEditTxForm({...editTxForm, memoNo: e.target.value})} className="h-8 px-2 text-xs w-full border border-slate-300 rounded dark:bg-slate-800 dark:border-slate-600 outline-none focus:border-blue-500" placeholder="Memo" />
+                          ) : tx.invoiceNo || tx.memoNo || "N/A"}
                         </td>
+                        
                         <td className="p-3 border border-slate-300 print-border">
                           <div className="flex flex-wrap gap-1">
                             {sortedTxMonths.length > 0 ? sortedTxMonths.map(m => (
@@ -418,6 +473,7 @@ export default function FeeHistory() {
                             )) : <span className="text-xs text-slate-400">-</span>}
                           </div>
                         </td>
+                        
                         <td className="p-3 border border-slate-300 print-border">
                           <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-400">
                             {Object.entries(tx.feeDetails || {}).map(([key, val]) => (
@@ -425,16 +481,35 @@ export default function FeeHistory() {
                             ))}
                           </div>
                         </td>
+                        
                         <td className="p-3 border border-slate-300 print-border text-right font-bold text-slate-900 dark:text-white print:text-black">
-                          ৳{Number(tx.grandTotal).toLocaleString()}
+                          {editTxId === tx.id ? (
+                             <input type="number" value={editTxForm.amount} onChange={e=>setEditTxForm({...editTxForm, amount: e.target.value})} className="h-8 px-2 text-sm w-20 ml-auto border border-slate-300 rounded dark:bg-slate-800 dark:border-slate-600 outline-none focus:border-blue-500 text-right font-bold" placeholder="Amt" />
+                          ) : `৳${Number(tx.grandTotal).toLocaleString()}`}
                         </td>
+                        
+                        <td className="p-3 border border-slate-300 text-center no-print align-middle">
+                           {editTxId === tx.id ? (
+                             <div className="flex justify-center gap-1.5">
+                               <button onClick={() => handleSaveEdit(tx.id)} className="p-1.5 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200 transition-colors" title="Save"><Check className="w-4 h-4" /></button>
+                               <button onClick={() => setEditTxId(null)} className="p-1.5 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" title="Cancel"><X className="w-4 h-4" /></button>
+                             </div>
+                           ) : (
+                             <div className="flex justify-center gap-1.5">
+                               <button onClick={() => handleEditClick(tx)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors" title="Edit row"><Edit2 className="w-4 h-4" /></button>
+                               <button onClick={() => handleDeleteTx(tx.id)} className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors" title="Delete record"><Trash2 className="w-4 h-4" /></button>
+                             </div>
+                           )}
+                        </td>
+
                       </tr>
                     )})}
                     <tr className="bg-slate-50 dark:bg-slate-800/50">
                       <td colSpan="4" className="p-4 border border-slate-300 print-border text-right font-black uppercase text-slate-700 dark:text-slate-300">Grand Total Paid:</td>
                       <td className="p-4 border border-slate-300 print-border text-right font-black text-lg text-emerald-600 dark:text-emerald-400 print:text-black">
-                        ৳{selectedStudentDetails.totalPaid.toLocaleString()}
+                        ৳{activeModalStudent.totalPaid.toLocaleString()}
                       </td>
+                      <td className="border border-slate-300 no-print"></td>
                     </tr>
                   </tbody>
                 </table>

@@ -27,19 +27,25 @@ export default function AdmitCard() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">প্রবেশপত্র তৈরি করুন</h1>
+    <div className="p-6 max-w-6xl mx-auto animate-in fade-in duration-300">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">প্রবেশপত্র তৈরি করুন</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">শিক্ষার্থীদের পরীক্ষার অ্যাডমিট কার্ড (Admit Card) তৈরি এবং ডাউনলোড করুন।</p>
+      </div>
       
       {!generatedData ? (
         <AdmitCardForm onSubmit={handleFormSubmit} isLoading={loading} />
       ) : (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 text-center">
-          <h2 className="text-xl font-semibold mb-2 text-green-600">সফলভাবে তৈরি সম্পন্ন!</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            {generatedData.students.length} জন শিক্ষার্থীর প্রবেশপত্র ডাউনলোডের জন্য প্রস্তুত।
+        <div className="bg-white dark:bg-slate-900 p-10 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 text-center animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-2 text-slate-800 dark:text-white">সফলভাবে তৈরি সম্পন্ন!</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-8 font-medium">
+            সর্বমোট <span className="font-bold text-indigo-600">{generatedData.students.length}</span> জন শিক্ষার্থীর প্রবেশপত্র ডাউনলোডের জন্য প্রস্তুত করা হয়েছে।
           </p>
 
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             <PDFDownloadLink
               document={
                 <AdmitCardTemplate 
@@ -49,14 +55,14 @@ export default function AdmitCard() {
                 />
               }
               fileName={getPdfFileName()}
-              className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition"
+              className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center justify-center"
             >
-              {({ loading }) => (loading ? 'ডকুমেন্ট প্রস্তুত করা হচ্ছে...' : 'পিডিএফ ডাউনলোড')}
+              {({ loading }) => (loading ? 'ডকুমেন্ট প্রস্তুত করা হচ্ছে...' : 'পিডিএফ ডাউনলোড করুন')}
             </PDFDownloadLink>
 
             <button 
               onClick={resetGenerator}
-              className="bg-slate-200 text-slate-800 px-6 py-2.5 rounded-lg font-medium hover:bg-slate-300 transition"
+              className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center justify-center"
             >
               নতুন তৈরি করুন
             </button>

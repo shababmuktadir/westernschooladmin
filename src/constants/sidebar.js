@@ -19,7 +19,9 @@ import {
   ClipboardCheck,    // for Teacher Attendance
   Search,            // for Teacher Details
   HandCoins,         // for Teacher Salary
-  LayoutTemplate     // for Blank Marksheet
+  LayoutTemplate,    // for Blank Marksheet
+  ReceiptText,       // for Expense/Invoice Manager
+  BarChart           // for Expense Dashboard
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -76,6 +78,14 @@ export const SIDEBAR_MENU = [
       { title: "হাজিরা ও রিপোর্ট", path: "/teachers/attendance", icon: ClipboardCheck },
       { title: "প্রোফাইল ও হিস্ট্রি", path: "/teachers/details", icon: Search },
       { title: "বেতন ও বোনাস", path: "/teachers/salary", icon: HandCoins }
+    ]
+  },
+  { 
+    title: "খরচের হিসাব", 
+    icon: ReceiptText,
+    subItems: [
+      { title: "নতুন এন্ট্রি ও রিপোর্ট", path: "/expenses", icon: ReceiptText },
+      { title: "ড্যাশবোর্ড ও লিস্ট", path: "/expense-dashboard", icon: BarChart }
     ]
   },
   { 

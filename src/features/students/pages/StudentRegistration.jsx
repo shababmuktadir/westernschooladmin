@@ -41,6 +41,7 @@ export default function StudentRegistration() {
         </Link>
       </div>
       
+      {/* Student Form Component where the DatePicker actually is */}
       <StudentForm onSubmit={handleCreateStudent} isSubmitting={isSubmitting} />
     </div>
   );

@@ -3,8 +3,8 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { studentSchema } from "@/features/students/schemas/studentSchema";
 import ImageUpload from "@/components/ui/ImageUpload";
-import Dropdown from "@/components/ui/Dropdown"; // Update: Select এর বদলে Dropdown
-import DatePicker from "@/components/ui/DatePicker";
+import Dropdown from "@/components/ui/Dropdown"; 
+import GlassDatePicker from "@/components/ui/GlassDatePicker"; // নতুন Glass Date Picker
 import { Save, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -112,11 +112,17 @@ export default function StudentForm({ defaultValues, onSubmit, isSubmitting }) {
 
           {/* DOB (Optional, Defaults to Today) */}
           <div className="relative z-20">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Date of Birth</label>
             <Controller
               name="dateOfBirth"
               control={control}
-              render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} />}
+              render={({ field }) => (
+                <GlassDatePicker 
+                  label="Date of Birth"
+                  value={field.value} 
+                  onChange={field.onChange} 
+                  placeholder="Select Date"
+                />
+              )}
             />
           </div>
 

@@ -13,7 +13,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
-import DatePicker from "@/components/ui/DatePicker"; // Custom DatePicker
+import GlassDatePicker from "@/components/ui/GlassDatePicker"; // নতুন Glass Date Picker
 
 import { Search, User, FileText, CheckCircle2, Calculator, Receipt, CreditCard, UploadCloud } from "lucide-react";
 
@@ -111,7 +111,7 @@ export default function FeeEntry() {
         setMonthFees(prevFees => ({
           ...prevFees,
           [month]: {
-            amounts: {} // Checkbox removed, just keeping empty object for amounts
+            amounts: {} 
           }
         }));
         return [...prev, month];
@@ -138,7 +138,6 @@ export default function FeeEntry() {
   selectedMonths.forEach(month => {
     const monthData = monthFees[month] || { amounts: {} };
     FEE_TYPES.forEach(fee => {
-      // Only count if an amount is entered
       const amount = Number(monthData.amounts[fee]) || 0;
       if (amount > 0) {
         aggregatedFees[fee] = (aggregatedFees[fee] || 0) + amount;
@@ -236,7 +235,7 @@ export default function FeeEntry() {
             variant="outline" 
             leftIcon={<UploadCloud className="w-4 h-4" />}
             onClick={() => navigate('/fee/bulk-import')}
-            className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-900/30"
+            className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-900/30 shadow-sm"
           >
             Bulk Fee Import
           </Button>
@@ -327,21 +326,25 @@ export default function FeeEntry() {
               </Card>
 
               {selectedMonths.length > 0 && (
-                <Card>
+                <Card className="overflow-visible">
                   <CardHeader>
                     <CardTitle className="text-base">মাস-ভিত্তিক ফি এর বিবরণ</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 mb-4">
-                      <Input 
-                        label="Invoice / Memo No (অটো জেনারেট)" 
-                        value={invoiceNo} 
-                        onChange={(e) => setInvoiceNo(e.target.value)} 
-                        placeholder="e.g. WSC-000001"
-                      />
+                  <CardContent className="space-y-6 overflow-visible">
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 mb-4 overflow-visible">
+                      <div className="relative z-30">
+                        <Input 
+                          label="Invoice / Memo No (অটো জেনারেট)" 
+                          value={invoiceNo} 
+                          onChange={(e) => setInvoiceNo(e.target.value)} 
+                          placeholder="e.g. WSC-000001"
+                        />
+                      </div>
                       
+                      {/* --- GlassDatePicker Implemented Here --- */}
                       <div className="relative z-40">
-                        <DatePicker 
+                        <GlassDatePicker 
                           label="Invoice Date" 
                           value={invoiceDate} 
                           onChange={(date) => setInvoiceDate(date)} 
@@ -349,7 +352,7 @@ export default function FeeEntry() {
                       </div>
                     </div>
 
-                    <Tabs defaultValue={selectedMonths[0]} className="w-full">
+                    <Tabs defaultValue={selectedMonths[0]} className="w-full relative z-10">
                       <TabsList className="mb-4 flex-wrap h-auto p-1.5 bg-slate-100 dark:bg-slate-800">
                         {selectedMonths.map(month => (
                           <TabsTrigger key={`tab-${month}`} value={month} className="flex-1 min-w-[80px]">
@@ -388,6 +391,7 @@ export default function FeeEntry() {
                         </TabsContent>
                       ))}
                     </Tabs>
+
                   </CardContent>
                 </Card>
               )}
@@ -402,7 +406,7 @@ export default function FeeEntry() {
                 <Calculator className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" /> সামারি (Summary)
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6 pt-4">
+            <CardContent className="space-y-6 pt-4 relative z-20">
               
               {Object.keys(aggregatedFees).length > 0 && (
                 <div className="space-y-2 mb-4 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
@@ -440,7 +444,7 @@ export default function FeeEntry() {
 
             </CardContent>
             
-            <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800">
+            <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 relative z-10">
               {!generatedInvoice ? (
                 <Button
                   variant="primary"
