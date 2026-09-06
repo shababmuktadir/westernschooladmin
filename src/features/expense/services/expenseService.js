@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { collection, doc, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, where, writeBatch } from "firebase/firestore";
 import { db } from "@/config/firebase";
 
 // --- Category Services ---
@@ -13,8 +13,25 @@ export const addCategory = async (name) => {
   return { id: docRef.id, name };
 };
 
-export const updateCategory = async (id, name) => {
-  await updateDoc(doc(db, "expenseCategories", id), { name });
+// 🛑 UPDATE: Cascade Update Logic Added Here
+export const updateCategory = async (id, newName, oldName) => {
+  const batch = writeBatch(db);
+
+  // ১. প্রথমে মূল ক্যাটাগরির নাম আপডেট করা
+  const categoryRef = doc(db, "expenseCategories", id);
+  batch.update(categoryRef, { name: newName });
+
+  // ২. পুরানো নামের যতগুলো খরচ (Expense/Invoice) আছে সব খুঁজে বের করা
+  const expenseQuery = query(collection(db, "expenses"), where("category", "==", oldName));
+  const snapshot = await getDocs(expenseQuery);
+
+  // ৩. লুপ চালিয়ে সবগুলো খরচের রেকর্ডে ক্যাটাগরির নাম আপডেট করা
+  snapshot.forEach((expenseDoc) => {
+    batch.update(expenseDoc.ref, { category: newName });
+  });
+
+  // ৪. সব পরিবর্তন একসাথে ডাটাবেসে সেভ করা
+  await batch.commit();
 };
 
 export const deleteCategory = async (id) => {
@@ -37,7 +54,7 @@ export const addExpense = async (expenseData) => {
 export const deleteExpense = async (id) => {
   await deleteDoc(doc(db, "expenses", id));
 };
-// Expense Services এর নিচে এটি যুক্ত করুন
+
 export const updateExpense = async (id, updatedData) => {
   try {
     await updateDoc(doc(db, "expenses", id), updatedData);

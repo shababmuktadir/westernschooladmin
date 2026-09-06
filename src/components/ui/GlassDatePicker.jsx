@@ -35,6 +35,13 @@ export default function GlassDatePicker({ label, value, onChange, placeholder = 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Update calendar when value prop changes externally
+  useEffect(() => {
+    if (value) {
+      setCurrentDate(new Date(value));
+    }
+  }, [value]);
+
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
@@ -44,9 +51,15 @@ export default function GlassDatePicker({ label, value, onChange, placeholder = 
   // --- Handlers ---
   const handleDateSelect = (e, day) => {
     e.preventDefault();
-    const newDate = new Date(currentYear, currentMonth, day + 1);
-    onChange(newDate.toISOString().split("T")[0]);
-    setIsOpen(false); // সিলেক্ট করার পর বন্ধ হয়ে যাবে
+    
+    // 🛑 BUG FIX: toISOString() ব্যবহারের কারণে ডেট ১ দিন পিছিয়ে যাচ্ছিল।
+    // তাই ম্যানুয়ালি Local YYYY-MM-DD ফরমেট তৈরি করা হলো।
+    const yyyy = currentYear;
+    const mm = String(currentMonth + 1).padStart(2, '0');
+    const dd = String(day + 1).padStart(2, '0');
+    
+    onChange(`${yyyy}-${mm}-${dd}`);
+    setIsOpen(false); 
   };
 
   const handleMonthSelect = (e, monthIndex) => {
@@ -70,6 +83,9 @@ export default function GlassDatePicker({ label, value, onChange, placeholder = 
     e.preventDefault();
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
   };
+
+  const valueDate = value ? new Date(value) : null;
+  const today = new Date();
 
   // --- Render Helpers ---
   const formattedValue = value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : "";
@@ -144,8 +160,8 @@ export default function GlassDatePicker({ label, value, onChange, placeholder = 
                   <div key={`empty-${i}`} />
                 ))}
                 {[...Array(daysInMonth)].map((_, i) => {
-                  const isSelected = value && new Date(value).getDate() === i + 1 && new Date(value).getMonth() === currentMonth && new Date(value).getFullYear() === currentYear;
-                  const isToday = new Date().getDate() === i + 1 && new Date().getMonth() === currentMonth && new Date().getFullYear() === currentYear;
+                  const isSelected = valueDate && valueDate.getDate() === i + 1 && valueDate.getMonth() === currentMonth && valueDate.getFullYear() === currentYear;
+                  const isToday = today.getDate() === i + 1 && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
 
                   return (
                     <button

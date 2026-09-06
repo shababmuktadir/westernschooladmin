@@ -15,13 +15,14 @@ import {
   MessageSquare, 
   CalendarCheck, 
   Send,
-  Contact,           // for Teacher Directory
-  ClipboardCheck,    // for Teacher Attendance
-  Search,            // for Teacher Details
-  HandCoins,         // for Teacher Salary
-  LayoutTemplate,    // for Blank Marksheet
-  ReceiptText,       // for Expense/Invoice Manager
-  BarChart           // for Expense Dashboard
+  Contact,
+  ClipboardCheck,
+  Search,
+  HandCoins,
+  LayoutTemplate,
+  ReceiptText,
+  BarChart,
+  Building
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -30,6 +31,7 @@ export const SIDEBAR_MENU = [
     path: "/", 
     icon: LayoutDashboard 
   },
+
   { 
     title: "শিক্ষার্থী সেকশন", 
     icon: GraduationCap,
@@ -42,6 +44,7 @@ export const SIDEBAR_MENU = [
           { title: "নিবন্ধন (Register)", path: "/students/register", icon: UserPlus }
         ]
       },
+
       { 
         title: "ফি মডিউল", 
         icon: Banknote,
@@ -51,18 +54,25 @@ export const SIDEBAR_MENU = [
           { title: "ফি রিপোর্ট", path: "/fee/report", icon: FilePieChart }
         ]
       },
+
       { 
         title: "ফলাফল মডিউল", 
         icon: FileSpreadsheet,
         subItems: [
-          { title: "ব্ল্যাঙ্ক মার্কশিট", path: "/result/blank-marksheet", icon: LayoutTemplate } 
+          { 
+            title: "ব্ল্যাঙ্ক মার্কশিট", 
+            path: "/result/blank-marksheet", 
+            icon: LayoutTemplate 
+          }
         ]
       },
+
       { 
         title: "প্রবেশপত্র", 
         path: "/admit-card", 
         icon: FileText 
       },
+
       { 
         title: "সিট প্ল্যান", 
         path: "/seat-plan", 
@@ -70,30 +80,71 @@ export const SIDEBAR_MENU = [
       }
     ]
   },
+
   { 
     title: "শিক্ষক সেকশন", 
     icon: Presentation,
     subItems: [
-      { title: "অ্যাকাউন্ট ও তালিকা", path: "/teachers/directory", icon: Contact },
-      { title: "হাজিরা ও রিপোর্ট", path: "/teachers/attendance", icon: ClipboardCheck },
-      { title: "প্রোফাইল ও হিস্ট্রি", path: "/teachers/details", icon: Search },
-      { title: "বেতন ও বোনাস", path: "/teachers/salary", icon: HandCoins }
+      { 
+        title: "অ্যাকাউন্ট ও তালিকা", 
+        path: "/teachers/directory", 
+        icon: Contact 
+      },
+      { 
+        title: "হাজিরা ও রিপোর্ট", 
+        path: "/teachers/attendance", 
+        icon: ClipboardCheck 
+      },
+      { 
+        title: "প্রোফাইল ও হিস্ট্রি", 
+        path: "/teachers/details", 
+        icon: Search 
+      },
+      { 
+        title: "বেতন ও বোনাস", 
+        path: "/teachers/salary", 
+        icon: HandCoins 
+      }
     ]
   },
+
   { 
     title: "খরচের হিসাব", 
     icon: ReceiptText,
     subItems: [
-      { title: "নতুন এন্ট্রি ও রিপোর্ট", path: "/expenses", icon: ReceiptText },
-      { title: "ড্যাশবোর্ড ও লিস্ট", path: "/expense-dashboard", icon: BarChart }
+      { 
+        title: "নতুন এন্ট্রি ও রিপোর্ট", 
+        path: "/expenses", 
+        icon: ReceiptText 
+      },
+      { 
+        title: "ড্যাশবোর্ড ও লিস্ট", 
+        path: "/expense-dashboard", 
+        icon: BarChart 
+      }
     ]
   },
+
+  {
+    title: "অন্যান্য আয় (রেন্ট)",
+    path: "/room-rent",
+    icon: Building
+  },
+
   { 
     title: "SMS মডিউল", 
     icon: MessageSquare,
     subItems: [
-      { title: "অটো হাজিরা SMS", path: "/attendance-sms", icon: CalendarCheck },
-      { title: "কাস্টম SMS", path: "/custom-sms", icon: Send }
+      { 
+        title: "অটো হাজিরা SMS", 
+        path: "/attendance-sms", 
+        icon: CalendarCheck 
+      },
+      { 
+        title: "কাস্টম SMS", 
+        path: "/custom-sms", 
+        icon: Send 
+      }
     ]
   }
 ];

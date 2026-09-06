@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { getCategories, addCategory, updateCategory, deleteCategory, getExpenses, addExpense, deleteExpense } from "../services/expenseService";
+// UPDATE: updateExpense ইমপোর্ট করা হয়েছে
+import { getCategories, addCategory, updateCategory, deleteCategory, getExpenses, addExpense, deleteExpense, updateExpense } from "../services/expenseService";
 import GlassDatePicker from "@/components/ui/GlassDatePicker";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import ExpenseReportTemplate from "@/templates/pdf/ExpenseReportTemplate";
-import { Plus, Edit2, Trash2, Save, Printer, Loader2, ListTree, ReceiptText, BarChart3, Search } from "lucide-react";
+import { Plus, Edit2, Trash2, Save, Printer, Loader2, ListTree, ReceiptText, BarChart3, Search, Check, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 // বাংলা সংখ্যা কনভার্টার
@@ -15,13 +16,13 @@ const engToBng = (num) => {
 const ALL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function ExpenseManager() {
-  const [activeTab, setActiveTab] = useState("entry"); // 'entry', 'categories', 'report'
+  const [activeTab, setActiveTab] = useState("entry"); 
   const [categories, setCategories] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Form States (Entry)
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState(""); // Managed by GlassDatePicker internally, will sync
   const [expenseCat, setExpenseCat] = useState("");
   const [expenseDesc, setExpenseDesc] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -31,6 +32,10 @@ export default function ExpenseManager() {
   const [newCatName, setNewCatName] = useState("");
   const [editCatId, setEditCatId] = useState(null);
   const [editCatName, setEditCatName] = useState("");
+
+  // Edit Expense States
+  const [editExpId, setEditExpId] = useState(null);
+  const [editExpData, setEditExpData] = useState({ category: "", description: "", amount: "" });
 
   // Report States
   const [reportMonth, setReportMonth] = useState(ALL_MONTHS[new Date().getMonth()]);
@@ -66,17 +71,20 @@ export default function ExpenseManager() {
     } catch (err) { toast.error("ব্যর্থ হয়েছে"); }
   };
 
-  const handleUpdateCategory = async (id) => {
+  const handleUpdateCategory = async (id, oldName) => {
     try {
-      await updateCategory(id, editCatName);
+      await updateCategory(id, editCatName, oldName);
       setCategories(categories.map(c => c.id === id ? { ...c, name: editCatName } : c));
+      setExpenses(expenses.map(exp => exp.category === oldName ? { ...exp, category: editCatName } : exp));
       setEditCatId(null);
-      toast.success("আপডেট হয়েছে");
-    } catch (err) { toast.error("ব্যর্থ হয়েছে"); }
+      toast.success("আপডেট হয়েছে এবং সকল ইনভয়েস পরিবর্তন করা হয়েছে!");
+    } catch (err) { 
+      toast.error("ব্যর্থ হয়েছে"); 
+    }
   };
 
   const handleDeleteCategory = async (id) => {
-    if (!window.confirm("ক্যাটাগরিটি মুছে ফেলতে চান?")) return;
+    // No confirmation popup as requested
     try {
       await deleteCategory(id);
       setCategories(categories.filter(c => c.id !== id));
@@ -109,12 +117,52 @@ export default function ExpenseManager() {
   };
 
   const handleDeleteExpense = async (id) => {
-    if (!window.confirm("এই হিসাবটি মুছে ফেলতে চান?")) return;
+    // No confirmation popup as requested
     try {
       await deleteExpense(id);
       setExpenses(expenses.filter(e => e.id !== id));
       toast.success("ডিলিট হয়েছে");
     } catch (err) { toast.error("ব্যর্থ হয়েছে"); }
+  };
+
+  // --- NEW: Edit Expense Handlers ---
+  const startEditExpense = (exp) => {
+    setEditExpId(exp.id);
+    setEditExpData({ category: exp.category, description: exp.description || "", amount: exp.amount });
+  };
+
+  const handleSaveEditExpense = async (id) => {
+    if (!editExpData.category || !editExpData.amount) return toast.error("ক্যাটাগরি এবং পরিমাণ আবশ্যক!");
+    try {
+      await updateExpense(id, {
+        category: editExpData.category,
+        description: editExpData.description,
+        amount: Number(editExpData.amount)
+      });
+      setExpenses(expenses.map(e => e.id === id ? { ...e, ...editExpData, amount: Number(editExpData.amount) } : e));
+      setEditExpId(null);
+      toast.success("হিসাব আপডেট হয়েছে!");
+    } catch (err) {
+      toast.error("আপডেট ব্যর্থ হয়েছে!");
+    }
+  };
+
+  // --- NEW: Bulk Delete All Expenses of a Month ---
+  const handleDeleteAllMonthExpenses = async () => {
+    // No confirmation popup as requested
+    try {
+      toast.loading("ডিলিট হচ্ছে...", { id: "bulkDelete" });
+      const idsToDelete = monthlyExpenses.map(e => e.id);
+      
+      // Delete all records from database concurrently
+      await Promise.all(idsToDelete.map(id => deleteExpense(id)));
+      
+      // Update UI state
+      setExpenses(expenses.filter(e => !idsToDelete.includes(e.id)));
+      toast.success("এই মাসের সব হিসাব ডিলিট হয়েছে!", { id: "bulkDelete" });
+    } catch (err) {
+      toast.error("ডিলিট ব্যর্থ হয়েছে!", { id: "bulkDelete" });
+    }
   };
 
   // --- Report Calculations ---
@@ -147,7 +195,7 @@ export default function ExpenseManager() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-8">
+      <div className="flex flex-wrap gap-4 mb-8">
         <button onClick={() => setActiveTab("entry")} className={`px-6 py-2.5 rounded-xl font-bold transition-colors flex items-center ${activeTab === "entry" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}>
           <Plus className="w-4 h-4 mr-2"/> নতুন এন্ট্রি
         </button>
@@ -165,7 +213,11 @@ export default function ExpenseManager() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             
             <div className="relative z-40">
-              <GlassDatePicker label="তারিখ নির্বাচন করুন" value={expenseDate} onChange={setExpenseDate} />
+              <GlassDatePicker 
+                label="তারিখ নির্বাচন করুন" 
+                value={expenseDate} 
+                onChange={(val) => setExpenseDate(val)} 
+              />
             </div>
 
             <div>
@@ -208,7 +260,7 @@ export default function ExpenseManager() {
                 {editCatId === cat.id ? (
                   <div className="flex w-full gap-2">
                     <input type="text" value={editCatName} onChange={e => setEditCatName(e.target.value)} className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm" />
-                    <button onClick={() => handleUpdateCategory(cat.id)} className="text-emerald-600"><Check className="w-5 h-5"/></button>
+                    <button onClick={() => handleUpdateCategory(cat.id, cat.name)} className="text-emerald-600"><Check className="w-5 h-5"/></button>
                   </div>
                 ) : (
                   <>
@@ -239,13 +291,24 @@ export default function ExpenseManager() {
               </select>
             </div>
             
-            <PDFDownloadLink
-              document={<ExpenseReportTemplate monthName={`${reportMonth}, ${reportYear}`} overallTotal={overallTotal} monthlyTotal={monthlyTotal} categorySummary={categorySummary} monthlyExpenses={monthlyExpenses} />}
-              fileName={`Expense_Report_${reportMonth}_${reportYear}.pdf`}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center transition shadow-lg shadow-emerald-500/20 whitespace-nowrap"
-            >
-              {({ loading }) => (loading ? "রিপোর্ট তৈরি হচ্ছে..." : <><Printer className="w-5 h-5 mr-2"/> রিপোর্ট প্রিন্ট (PDF)</>)}
-            </PDFDownloadLink>
+            <div className="flex flex-wrap gap-3">
+              {monthlyExpenses.length > 0 && (
+                <button 
+                  onClick={handleDeleteAllMonthExpenses} 
+                  className="bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-200 dark:border-red-800 px-5 py-2.5 rounded-xl font-bold flex items-center transition whitespace-nowrap"
+                >
+                  <Trash2 className="w-4 h-4 mr-2"/> সব ডিলিট করুন
+                </button>
+              )}
+
+              <PDFDownloadLink
+                document={<ExpenseReportTemplate monthName={`${reportMonth}, ${reportYear}`} overallTotal={overallTotal} monthlyTotal={monthlyTotal} categorySummary={categorySummary} monthlyExpenses={monthlyExpenses} />}
+                fileName={`Expense_Report_${reportMonth}_${reportYear}.pdf`}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center transition shadow-lg shadow-emerald-500/20 whitespace-nowrap"
+              >
+                {({ loading }) => (loading ? "রিপোর্ট তৈরি হচ্ছে..." : <><Printer className="w-5 h-5 mr-2"/> রিপোর্ট প্রিন্ট (PDF)</>)}
+              </PDFDownloadLink>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -264,7 +327,7 @@ export default function ExpenseManager() {
               <h2 className="font-bold text-slate-800 dark:text-white">বিস্তারিত হিসাব ({reportMonth}, {reportYear})</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left whitespace-nowrap">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm">
                   <tr>
                     <th className="p-4 font-semibold">তারিখ</th>
@@ -277,14 +340,57 @@ export default function ExpenseManager() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                   {monthlyExpenses.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-500">এই মাসে কোনো খরচ নেই।</td></tr>}
                   {monthlyExpenses.map(exp => (
-                    <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                      <td className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300">{engToBng(exp.date)}</td>
-                      <td className="p-4 text-sm font-bold text-slate-800 dark:text-slate-200">{exp.category}</td>
-                      <td className="p-4 text-sm text-slate-500">{exp.description || "-"}</td>
-                      <td className="p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">৳ {engToBng(exp.amount)}</td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => handleDeleteExpense(exp.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"><Trash2 className="w-4 h-4"/></button>
-                      </td>
+                    <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      {editExpId === exp.id ? (
+                        <>
+                          <td className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300">{engToBng(exp.date)}</td>
+                          <td className="p-4">
+                            <select 
+                              value={editExpData.category} 
+                              onChange={e => setEditExpData({...editExpData, category: e.target.value})} 
+                              className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm outline-none focus:border-blue-500"
+                            >
+                              {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-4">
+                            <input 
+                              type="text" 
+                              value={editExpData.description} 
+                              onChange={e => setEditExpData({...editExpData, description: e.target.value})} 
+                              className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm outline-none focus:border-blue-500" 
+                              placeholder="বিবরণ"
+                            />
+                          </td>
+                          <td className="p-4 text-right">
+                            <input 
+                              type="number" 
+                              value={editExpData.amount} 
+                              onChange={e => setEditExpData({...editExpData, amount: e.target.value})} 
+                              className="w-24 px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm text-right outline-none focus:border-blue-500 inline-block" 
+                            />
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="flex justify-center gap-1">
+                              <button onClick={() => handleSaveEditExpense(exp.id)} className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 rounded-lg transition-colors"><Check className="w-4 h-4"/></button>
+                              <button onClick={() => setEditExpId(null)} className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 rounded-lg transition-colors"><X className="w-4 h-4"/></button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300">{engToBng(exp.date)}</td>
+                          <td className="p-4 text-sm font-bold text-slate-800 dark:text-slate-200">{exp.category}</td>
+                          <td className="p-4 text-sm text-slate-500 truncate max-w-[200px]" title={exp.description}>{exp.description || "-"}</td>
+                          <td className="p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">৳ {engToBng(exp.amount)}</td>
+                          <td className="p-4 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => startEditExpense(exp)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors" title="এডিট করুন"><Edit2 className="w-4 h-4"/></button>
+                              <button onClick={() => handleDeleteExpense(exp.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors" title="ডিলিট করুন"><Trash2 className="w-4 h-4"/></button>
+                            </div>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

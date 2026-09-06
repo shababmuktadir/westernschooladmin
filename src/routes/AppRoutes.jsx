@@ -24,6 +24,7 @@ import TeacherSalary from "@/features/teachers/pages/TeacherSalary";
 import BlankMarksheet from "@/features/result/pages/BlankMarksheet";
 import ExpenseManager from "@/features/expense/pages/ExpenseManager";
 import ExpenseDashboard from "@/features/expense/pages/ExpenseDashboard";
+import RoomRentManager from "@/features/otherIncome/pages/RoomRentManager";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -45,6 +46,7 @@ export default function AppRoutes() {
           <Route path="/teachers/directory" element={<TeacherDirectory />} />
           <Route path="/teachers/attendance" element={<TeacherAttendance />} />
           {/* ✅ New route */}
+          <Route path="/room-rent" element={<RoomRentManager />} />
           <Route path="/expense-dashboard" element={<ExpenseDashboard />} />
           <Route path="/expenses" element={<ExpenseManager />} />
           <Route path="/fee/report" element={<FeeReport />} />
