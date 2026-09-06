@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { getExpenses, deleteExpense, updateExpense, getCategories } from "../services/expenseService";
 import GlassDatePicker from "@/components/ui/GlassDatePicker";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import html2canvas from 'html2canvas';
 import { Loader2, Receipt, Trash2, Edit2, Camera, X, TrendingUp, TrendingDown, Wallet, CalendarDays, Check } from "lucide-react";
 import toast from "react-hot-toast";
@@ -11,7 +11,7 @@ const engToBng = (num) => {
   return String(num).split('').map(digit => bngDigits[digit] || digit).join('');
 };
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#f43f5e', '#84cc16', '#6366f1'];
 
 export default function ExpenseDashboard() {
   const [expenses, setExpenses] = useState([]);
@@ -187,20 +187,30 @@ export default function ExpenseDashboard() {
         </div>
 
         {/* Pie Chart (Categories) */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-6">ক্যাটাগরি ভিত্তিক খরচ (Category Wise)</h3>
-          <div className="h-[300px] w-full flex items-center justify-center">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col">
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4">ক্যাটাগরি ভিত্তিক খরচ (Category Wise)</h3>
+          
+          <div className="h-[220px] w-full flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">
+                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
                   {categoryData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Custom Responsive Legend (Labels) */}
+          <div className="flex flex-wrap justify-center gap-2 mt-6">
+            {categoryData.map((entry, index) => (
+              <div key={index} className="flex items-center px-2.5 py-1 bg-slate-50 dark:bg-[#151c2c] rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                {entry.name}
+              </div>
+            ))}
           </div>
         </div>
       </div>
