@@ -22,7 +22,8 @@ import {
   LayoutTemplate,
   ReceiptText,
   BarChart,
-  Building
+  Building,
+  BookOpen
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -63,6 +64,11 @@ export const SIDEBAR_MENU = [
             title: "ব্ল্যাঙ্ক মার্কশিট", 
             path: "/result/blank-marksheet", 
             icon: LayoutTemplate 
+          },
+          { 
+            title: "বিষয়ভিত্তিক রেজাল্ট", 
+            path: "/result/subject-entry", 
+            icon: BookOpen 
           }
         ]
       },

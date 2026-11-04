@@ -5,8 +5,18 @@ import { format } from "date-fns";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/config/firebase"; 
 import Dropdown from "@/components/ui/Dropdown";
-import { BellRing, CheckCircle2, Edit } from "lucide-react";
+import { BellRing, CheckCircle2, Edit, Info } from "lucide-react";
 import toast from "react-hot-toast";
+
+// SMS unit rate (BDT per SMS)
+const SMS_RATE = 0.39;
+
+// Convert any balance value (string/number) into how many SMS units it can cover
+const calcSmsQuantity = (balanceValue) => {
+  const bal = parseFloat(balanceValue);
+  if (isNaN(bal)) return null;
+  return Math.floor(bal / SMS_RATE);
+};
 
 // Helper function to safely match IDs (ignores leading zeros and type differences)
 const isIdMatch = (id1, id2) => {
@@ -21,7 +31,7 @@ export default function AttendanceSmsPage() {
   const [isSending, setIsSending] = useState(false);
 
   const todayDate = format(new Date(), "dd MMM, yyyy");
-  const currentDayName = format(new Date(), "EEEE"); // Gets current day, e.g., "Tuesday"
+  const currentDayName = format(new Date(), "EEEE");
 
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -31,25 +41,23 @@ export default function AttendanceSmsPage() {
   const [parsedTxtData, setParsedTxtData] = useState([]);
   const [fileError, setFileError] = useState("");
 
-  // Customizable Fixed Recipients State
   const [fixedContact1, setFixedContact1] = useState({ name: "Shabab", phone: "01632426210" });
   const [fixedContact2, setFixedContact2] = useState({ name: "Fahad", phone: "01674785990" });
 
-  // Editable SMS Template
   const [smsTemplate, setSmsTemplate] = useState("Dear Guardian, your child {name} has entered the school premises at {time} on {date}. - Western School");
 
-  // Modals State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultData, setResultData] = useState({ success: 0, failed: 0, cost: "0.00" });
+
+  const smsQuantity = calcSmsQuantity(balance);
 
   useEffect(() => {
     fetchBalance();
     fetchStudents();
   }, []);
 
-  // Enter Key Listener for Modals
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
@@ -213,7 +221,6 @@ export default function AttendanceSmsPage() {
     const oldBalStr = await checkSmsBalance();
     const oldBal = parseFloat(oldBalStr) || 0;
 
-    // 1. Send SMS to all matched students using Editable Template
     for (const record of parsedTxtData) {
       const student = students.find(s => isIdMatch(s.studentId, record.studentId));
       if (student && student.contactNumber) {
@@ -230,7 +237,6 @@ export default function AttendanceSmsPage() {
       }
     }
 
-    // 2. Send Fixed SMS using the Same Template but fixed data
     const fixedNumbers = [fixedContact1, fixedContact2].filter(c => c.phone && c.phone.trim() !== "");
 
     for (const admin of fixedNumbers) {
@@ -238,8 +244,8 @@ export default function AttendanceSmsPage() {
         const adminMsg = smsTemplate
           .replace(/{name}/g, admin.name)
           .replace(/{id}/g, "Admin")
-          .replace(/{time}/g, "8:15 am") // Fixed Time
-          .replace(/{date}/g, todayDate); // Current Day
+          .replace(/{time}/g, "8:15 am")
+          .replace(/{date}/g, todayDate);
           
         const res = await sendSMS(admin.phone, adminMsg);
         res.success ? successCount++ : failCount++;
@@ -249,7 +255,6 @@ export default function AttendanceSmsPage() {
       }
     }
 
-    // 3. Save logs to Firestore
     try {
       await setDoc(doc(db, "attendance_logs", "latest_txt_upload"), {
         uploadedAt: new Date().toISOString(),
@@ -281,6 +286,23 @@ export default function AttendanceSmsPage() {
     <>
       <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 relative z-0">
         
+        {/* 📢 APP VERSION NOTICE BAR */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              📢 Notice — App Version Now Available
+            </p>
+            <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+              This website now has a dedicated <strong>App version</strong>. Many features are <strong>not available</strong> on the website.
+              Please use the mobile app to access the full feature set.
+              <span className="block mt-1 text-xs">
+                বিজ্ঞপ্তি: ওয়েবসাইটটির এখন একটি অ্যাপ ভার্সন রয়েছে। এখানে অনেক ফিচার উপলব্ধ নয়। সম্পূর্ণ সুবিধার জন্য অ্যাপটি ব্যবহার করুন।
+              </span>
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
           <div>
             <h2 className="text-xl font-bold text-slate-800 dark:text-white">Smart Attendance SMS</h2>
@@ -288,7 +310,9 @@ export default function AttendanceSmsPage() {
           </div>
           <div className="flex items-center gap-4 mt-4 md:mt-0">
             <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 font-semibold">
-              Balance: ৳ {balance}
+              {smsQuantity !== null
+                ? `SMS Left: ${smsQuantity.toLocaleString()} pcs`
+                : "Loading SMS quantity..."}
             </div>
             <button onClick={fetchBalance} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors">
               Refresh
@@ -393,7 +417,6 @@ export default function AttendanceSmsPage() {
           {activeTab === "bulk" && (
             <div className="animate-in fade-in py-4">
               
-              {/* Editable SMS Template Section */}
               <div className="bg-indigo-50 dark:bg-indigo-900/10 p-5 rounded-xl border border-indigo-200 dark:border-indigo-800/50 mb-6">
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
                   <Edit className="w-5 h-5 text-indigo-500" />
@@ -407,7 +430,6 @@ export default function AttendanceSmsPage() {
                 />
               </div>
 
-              {/* Fixed Recipients Settings */}
               <div className="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                   <BellRing className="w-5 h-5 text-blue-500" />
@@ -433,7 +455,6 @@ export default function AttendanceSmsPage() {
                 </div>
               </div>
 
-              {/* File Upload Area */}
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 bg-slate-50 dark:bg-slate-800/20 mb-6">
                 <p className="text-slate-600 dark:text-slate-400 mb-4 font-medium text-center">
                   Upload your Machine generated TXT file here. <br/>
@@ -448,7 +469,6 @@ export default function AttendanceSmsPage() {
                 {fileError && <p className="text-red-500 text-sm mt-3">{fileError}</p>}
               </div>
 
-              {/* Data Table */}
               {parsedTxtData.length > 0 && (
                 <div>
                   <div className="flex justify-between items-center mb-4">
@@ -500,13 +520,13 @@ export default function AttendanceSmsPage() {
         </div>
       </div>
 
-      {/* --- GLASSMORPHISM CONFIRM MODAL --- */}
+      {/* --- CONFIRM MODAL --- */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowConfirmModal(false)}></div>
           <div className="bg-white/10 dark:bg-[#0f172a]/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/50 rounded-3xl shadow-2xl max-w-sm w-full p-8 relative z-10 text-center animate-in zoom-in-95">
             <h2 className="text-2xl font-bold text-white mb-2">Confirm SMS Send</h2>
-            <p className="text-slate-300 text-sm mb-8">Are you sure you want to send the SMS? This action will deduct balance from your account.</p>
+            <p className="text-slate-300 text-sm mb-8">Are you sure you want to send the SMS? This action will deduct SMS units from your account.</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setShowConfirmModal(false)} className="px-6 py-2.5 rounded-xl font-bold bg-slate-800/80 text-white hover:bg-slate-700 border border-slate-600 transition-colors">Cancel</button>
               <button onClick={() => { if(confirmAction) confirmAction(); }} className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 border border-blue-500 transition-colors shadow-lg shadow-blue-500/30">Send (Enter)</button>
@@ -515,7 +535,7 @@ export default function AttendanceSmsPage() {
         </div>
       )}
 
-      {/* --- GLASSMORPHISM RESULT & COST MODAL --- */}
+      {/* --- RESULT MODAL --- */}
       {showResultModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowResultModal(false)}></div>
@@ -528,7 +548,8 @@ export default function AttendanceSmsPage() {
             <div className="bg-slate-900/50 rounded-xl p-4 mb-6 text-left space-y-2 border border-slate-700/50">
               <div className="flex justify-between text-sm"><span className="text-slate-400">Successfully Sent:</span> <span className="font-bold text-emerald-400">{resultData.success}</span></div>
               <div className="flex justify-between text-sm"><span className="text-slate-400">Failed / No Number:</span> <span className="font-bold text-red-400">{resultData.failed}</span></div>
-              <div className="border-t border-slate-700/50 pt-2 mt-2 flex justify-between text-sm"><span className="text-slate-300 font-medium">Total Cost Deducted:</span> <span className="font-bold text-blue-400 text-base">৳ {resultData.cost}</span></div>
+              <div className="border-t border-slate-700/50 pt-2 mt-2 flex justify-between text-sm"><span className="text-slate-300 font-medium">SMS Units Used:</span> <span className="font-bold text-blue-400 text-base">{Math.round((parseFloat(resultData.cost) || 0) / SMS_RATE)} pcs</span></div>
+              <div className="flex justify-between text-xs"><span className="text-slate-400">Approx. Cost:</span> <span className="text-slate-300">৳ {resultData.cost}</span></div>
             </div>
 
             <button onClick={() => setShowResultModal(false)} className="w-full px-6 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30">OK (Press Enter)</button>

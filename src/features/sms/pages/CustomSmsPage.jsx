@@ -2,6 +2,17 @@ import React, { useState, useEffect } from "react";
 import { checkSmsBalance, sendSMS } from "../services/smsService";
 import { getStudents } from "@/features/students/services/studentService"; 
 import Dropdown from "@/components/ui/Dropdown";
+import { Info } from "lucide-react";
+
+// SMS unit rate (BDT per SMS)
+const SMS_RATE = 0.39;
+
+// Convert any balance value (string/number) into how many SMS units it can cover
+const calcSmsQuantity = (balanceValue) => {
+  const bal = parseFloat(balanceValue);
+  if (isNaN(bal)) return null;
+  return Math.floor(bal / SMS_RATE);
+};
 
 export default function CustomSmsPage() {
   const [balance, setBalance] = useState("Loading...");
@@ -14,6 +25,8 @@ export default function CustomSmsPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [classFilter, setClassFilter] = useState("");
+
+  const smsQuantity = calcSmsQuantity(balance);
 
   useEffect(() => {
     fetchBalance();
@@ -100,7 +113,7 @@ export default function CustomSmsPage() {
       setMessage("");
       setSelectedPhones([]);
     } else {
-      alert(`Failed to send SMS to ${failCount} numbers. Please check your balance or gateway.`);
+      alert(`Failed to send SMS to ${failCount} numbers. Please check your SMS quantity or gateway.`);
     }
   };
 
@@ -119,6 +132,23 @@ export default function CustomSmsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       
+      {/* 📢 APP VERSION NOTICE BAR */}
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-semibold text-amber-800 dark:text-amber-300">
+            📢 Notice — App Version Now Available
+          </p>
+          <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+            This website now has a dedicated <strong>App version</strong>. Many features are <strong>not available</strong> on the website.
+            Please use the mobile app to access the full feature set.
+            <span className="block mt-1 text-xs">
+              বিজ্ঞপ্তি: ওয়েবসাইটটির এখন একটি অ্যাপ ভার্সন রয়েছে। এখানে অনেক ফিচার উপলব্ধ নয়। সম্পূর্ণ সুবিধার জন্য অ্যাপটি ব্যবহার করুন।
+            </span>
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">Custom Bulk SMS</h2>
@@ -126,7 +156,9 @@ export default function CustomSmsPage() {
         </div>
         <div className="flex items-center gap-4 mt-4 md:mt-0">
           <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 font-semibold">
-            Balance: ৳ {balance}
+            {smsQuantity !== null
+              ? `SMS Left: ${smsQuantity.toLocaleString()} pcs`
+              : "Loading SMS quantity..."}
           </div>
           <button onClick={fetchBalance} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors">
             Refresh

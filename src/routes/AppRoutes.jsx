@@ -25,6 +25,7 @@ import BlankMarksheet from "@/features/result/pages/BlankMarksheet";
 import ExpenseManager from "@/features/expense/pages/ExpenseManager";
 import ExpenseDashboard from "@/features/expense/pages/ExpenseDashboard";
 import RoomRentManager from "@/features/otherIncome/pages/RoomRentManager";
+import SubjectResultEntry from "@/features/results/pages/SubjectResultEntry";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -46,6 +47,7 @@ export default function AppRoutes() {
           <Route path="/teachers/directory" element={<TeacherDirectory />} />
           <Route path="/teachers/attendance" element={<TeacherAttendance />} />
           {/* ✅ New route */}
+          <Route path="/result/subject-entry" element={<SubjectResultEntry />} />
           <Route path="/room-rent" element={<RoomRentManager />} />
           <Route path="/expense-dashboard" element={<ExpenseDashboard />} />
           <Route path="/expenses" element={<ExpenseManager />} />
