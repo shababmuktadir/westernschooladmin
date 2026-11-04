@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { getStudents, deleteStudent, addStudent } from "@/features/students/services/studentService";
 import {
   Eye, Edit, Trash2, Search, User, Copy, Check, Download, Loader2,
-  Upload, FileSpreadsheet, X, AlertTriangle,
+  Upload, FileSpreadsheet, X, AlertTriangle, Info,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
@@ -90,7 +90,7 @@ export default function StudentList() {
     return classes.sort((a, b) => getClassRank(a) - getClassRank(b));
   }, [students]);
 
-  // ---------- EXCEL EXPORT (all students) ----------
+  // ---------- EXCEL EXPORT ----------
   const handleExportExcel = () => {
     if (students.length === 0) return toast.error("No students to export");
 
@@ -104,9 +104,7 @@ export default function StudentList() {
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
-    ws["!cols"] = [
-      { wch: 15 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 10 },
-    ];
+    ws["!cols"] = [{ wch: 15 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 10 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Students");
@@ -148,7 +146,7 @@ export default function StudentList() {
         const invalid = [];
 
         rows.forEach((r, idx) => {
-          const rowNum = idx + 2; // Excel row (header = 1)
+          const rowNum = idx + 2;
           if (!r.studentId || !r.fullName) {
             invalid.push({ ...r, _rowNum: rowNum, _reason: "Missing Student ID or Name" });
           } else if (existingIds.has(r.studentId)) {
@@ -175,7 +173,7 @@ export default function StudentList() {
       }
     };
     reader.readAsArrayBuffer(file);
-    e.target.value = ""; // allow re-upload same file
+    e.target.value = "";
   };
 
   const handleConfirmImport = async () => {
@@ -205,14 +203,11 @@ export default function StudentList() {
     setIsImporting(false);
     setShowImportModal(false);
     setParsedImportData(null);
-    toast.success(
-      `Imported ${success} student(s)${failed ? ` • ${failed} failed` : ""}`,
-      { duration: 5000 }
-    );
+    toast.success(`Imported ${success} student(s)${failed ? ` • ${failed} failed` : ""}`, { duration: 5000 });
     fetchStudents();
   };
 
-  // ---------- PDF (unchanged) ----------
+  // ---------- PDF ----------
   const handleDownloadClassList = async () => {
     setIsGeneratingPDF(true);
     try {
@@ -269,6 +264,23 @@ export default function StudentList() {
 
   return (
     <div className="animate-in fade-in duration-300">
+      
+      {/* 🚨 DECEMBER SHUTDOWN & FEATURE NOTICE BAR 🚨 */}
+      <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+        <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-bold text-red-800 dark:text-red-300 text-base">
+            Important Notice: Web Version Shutdown
+          </h3>
+          <p className="text-red-700 dark:text-red-400 text-sm mt-1">
+            Many features are <strong>not available</strong> on this website. Please be informed that the <strong>web version will be permanently shut down from December</strong>. To continue using the service with full features, please switch to our mobile app.
+          </p>
+          <p className="text-red-700 dark:text-red-400 text-sm mt-1 font-medium">
+            গুরুত্বপূর্ণ নোটিশ: এই ওয়েবসাইটে অনেক ফিচার পাওয়া যাবে না। আগামী <strong>ডিসেম্বর থেকে ওয়েব ভার্সনটি বন্ধ হয়ে যাবে</strong>। সম্পূর্ণ সুবিধার জন্য দয়া করে আমাদের মোবাইল অ্যাপটি ব্যবহার করুন।
+          </p>
+        </div>
+      </div>
+
       {/* Header & Controls */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-6">
         <div>
@@ -386,12 +398,11 @@ export default function StudentList() {
         </div>
       </div>
 
-      {/* ---------- IMPORT PREVIEW MODAL ---------- */}
+      {/* IMPORT PREVIEW MODAL */}
       {showImportModal && parsedImportData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => !isImporting && setShowImportModal(false)}></div>
           <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
-            {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-indigo-500" />
@@ -406,9 +417,7 @@ export default function StudentList() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-center">
                   <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">New (Will Import)</p>
@@ -424,7 +433,6 @@ export default function StudentList() {
                 </div>
               </div>
 
-              {/* Valid rows preview */}
               {parsedImportData.valid.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Students to be added:</h3>
@@ -455,7 +463,6 @@ export default function StudentList() {
                 </div>
               )}
 
-              {/* Duplicates */}
               {parsedImportData.duplicates.length > 0 && (
                 <details className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
@@ -470,7 +477,6 @@ export default function StudentList() {
                 </details>
               )}
 
-              {/* Invalid */}
               {parsedImportData.invalid.length > 0 && (
                 <details className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-red-800 dark:text-red-400 flex items-center gap-2">
@@ -486,7 +492,6 @@ export default function StudentList() {
               )}
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setShowImportModal(false)}
